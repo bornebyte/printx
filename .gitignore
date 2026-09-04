@@ -1,4 +1,22 @@
 node_modules/
 .env
+.env.*
+!.env.example
+!frontend/.env.example
 .next/
 dist/
+
+# Package-manager and build output
+coverage/
+*.tsbuildinfo
+.turbo/
+.pnpm-debug.log*
+
+# Local/system files
+.DS_Store
+*.log
+
+# Credentials and private keys
+firebase-service-account*.json
+service-account*.json
+*.pem
