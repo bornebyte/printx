@@ -109,7 +109,7 @@ The current frontend uses Firebase Identity Toolkit REST calls for email/passwor
 
 PrintX is configured as one Next.js deployment. The catch-all route at `frontend/app/api/[[...path]]/route.ts` adapts the existing backend service to Next.js Route Handlers, so the website, authenticated API, Gmail route, and agent API are served by one deployment URL. Keep `NEXT_PUBLIC_API_URL` empty for this mode. The owner-generated agent configuration should use the same public URL, for example `PRINTX_BACKEND_URL=https://printx.example.com`.
 
-For Vercel, import the repository as one project from its root. The included `vercel.json` uses pnpm, builds the `frontend` workspace, and points Vercel at `frontend/.next`. Add the Firebase web variables, Firestore service-account variable, and Gmail variables in that one Vercel project. `FIREBASE_SERVICE_ACCOUNT_BASE64` is the most convenient server-only option for Vercel; never use a `NEXT_PUBLIC_` prefix for it.
+For Vercel, import the repository as one project from its root. The included `vercel.json` uses pnpm, builds the `frontend` workspace, and points Vercel at `frontend/.next`. Add the Firebase web variables, Firestore service-account variable, and Gmail variables in that one Vercel project. Set `FIREBASE_SERVICE_ACCOUNT_BASE64` (or `FIREBASE_SERVICE_ACCOUNT_JSON`) in Vercel; do not set a local-machine `FIREBASE_SERVICE_ACCOUNT_FILE` path there. Never use a `NEXT_PUBLIC_` prefix for server credentials.
 
 Because the agent is a persistent computer process and must print while the browser is closed, it remains a separate installation on each printer computer. It connects outbound to the same deployed URL; it does not require a second web deployment.
 

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { backendReady, handleRequest } from "../../../../backend/server.mjs";
+import { ensureBackendReady, handleRequest } from "../../../../backend/server.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,7 +74,7 @@ function forwardToBackend(request: Request) {
 }
 
 async function route(request: Request) {
-  await backendReady;
+  await ensureBackendReady();
   return forwardToBackend(request);
 }
 

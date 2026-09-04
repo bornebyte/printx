@@ -36,7 +36,7 @@ const documentsDir = resolve(dirname(dataFile), "documents");
 const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
 const storageMode = String(process.env.PRINTX_STORAGE ?? "firestore").trim().toLowerCase();
 if (storageMode !== "firestore" && storageMode !== "local") throw new Error("PRINTX_STORAGE must be either firestore or local.");
-const firestoreStore = storageMode === "firestore" ? await createFirestoreStore() : null;
+let firestoreStore = null;
 
 const printerDirectory = new Map([
   ["PX-4812", {
@@ -511,13 +511,19 @@ export async function handleRequest(request, response) {
   json(response, 404, { error: "Route not found." });
 }
 
-export const backendReady = loadStore().then(() => {
-  console.log(`PrintX persistence: ${storageMode}`);
-});
+let backendReadyPromise = null;
+export function ensureBackendReady() {
+  backendReadyPromise ??= (async () => {
+    firestoreStore = storageMode === "firestore" ? await createFirestoreStore() : null;
+    await loadStore();
+    console.log(`PrintX persistence: ${storageMode}`);
+  })();
+  return backendReadyPromise;
+}
 
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === backendFile;
 if (isDirectRun) {
-  await backendReady;
+  await ensureBackendReady();
   createServer((request, response) => {
     handleRequest(request, response).catch((error) => {
       console.error("Unhandled backend error", error);

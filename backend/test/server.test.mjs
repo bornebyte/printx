@@ -12,6 +12,8 @@ test("backend exposes the expected API entrypoints", async () => {
   assert.match(source, /agentToken/);
   assert.match(source, /createFirestoreStore/);
   assert.match(source, /PRINTX_STORAGE/);
+  assert.match(source, /ensureBackendReady/);
+  assert.doesNotMatch(source, /const firestoreStore = storageMode/);
 });
 
 test("Firestore adapter keeps service-account configuration server-side", async () => {
