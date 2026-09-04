@@ -21,4 +21,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `app/api/email/route.ts` sends Gmail SMTP mail with Node's built-in TLS support. Never expose Gmail app-password variables to client code and do not add a third-party email module for this requirement.
 - Browser notifications are implemented in `lib/browser-notifications.ts` and must remain optional.
 - The production website and backend API are one Next.js deployment. The persistent printer agent remains separately installed on printer-owner computers and connects to the same public URL.
-- Prefer pnpm (`pnpm@10.33.2`) for installs and scripts. Run `pnpm lint` and `pnpm build` from this directory after meaningful changes.
+- Prefer pnpm (`pnpm@9.15.9`) for installs and scripts. Run `pnpm lint` and `pnpm build` from this directory after meaningful changes.

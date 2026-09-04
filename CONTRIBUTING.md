@@ -6,7 +6,7 @@ Thanks for helping build a more accessible printer network.
 
 Read the repository guidance in [AGENTS.md](AGENTS.md). Frontend changes should also follow [frontend/AGENTS.md](frontend/AGENTS.md).
 
-Use pnpm 10.33.2 for installs and scripts from the repository root:
+Use pnpm 9.15.9 for installs and scripts from the repository root:
 
 ```bash
 pnpm install

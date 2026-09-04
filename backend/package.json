@@ -12,7 +12,7 @@
     "build": "node --check server.mjs && node --check firestore.mjs",
     "test": "node --test"
   },
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@9.15.9",
   "dependencies": {},
   "devDependencies": {}
 }

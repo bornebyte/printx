@@ -48,7 +48,7 @@ printx/
 
 ## Quick start
 
-Requirements: Node.js 20+ and pnpm 10.33.2.
+Requirements: Node.js 20.9–20.x and pnpm 9.15.9.
 
 ```bash
 pnpm install
