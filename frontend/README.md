@@ -38,7 +38,7 @@ Printer shopkeepers choose a supported currency and price per page when register
 
 ## Local setup
 
-Copy `.env.example` to `.env.local`. Set the Firebase web config values (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from one Firebase project, then enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them. Leave `NEXT_PUBLIC_API_URL` empty when using the unified deployment.
+Copy `.env.example` to `.env.local`. Set the Firebase web config values (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from one Firebase project, then enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them. Leave `NEXT_API_URL` empty when using the unified deployment.
 
 The Gmail credentials are consumed only by `app/api/email/route.ts`, which uses Node's built-in TLS client to talk to Gmail SMTP. They must never use `NEXT_PUBLIC_*` variables.
 

@@ -11,7 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## PrintX-specific rules
 
 - `/` is the public marketing home screen; `/dashboard` is the working printer-code workspace.
-- `app/api/[[...path]]/route.ts` is the unified Node.js API bridge. Keep production `NEXT_PUBLIC_API_URL` empty so browser requests stay same-origin; only set it for an intentional standalone backend run.
+- `app/api/[[...path]]/route.ts` is the unified Node.js API bridge. Keep production `NEXT_API_URL` empty so browser requests stay same-origin; only set it for an intentional standalone backend run.
 - Authentication offers two roles: `user` for sending jobs and `owner` for registering physical printers. Keep their workspace experiences separate.
 - Users start with an empty list and add printer shops using a unique printer code. Do not reintroduce a generic nearby-printer discovery flow without an explicit product decision.
 - The current demo codes are `PX-4812`, `PX-7390`, and `PX-1055`.

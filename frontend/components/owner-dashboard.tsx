@@ -115,7 +115,7 @@ function AgentConnector({ session, printers }: { session: AuthSession; printers:
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+  const backendUrl = process.env.NEXT_API_URL?.trim().replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
   async function connect() {
     if (!selectedPrinterId) return;
