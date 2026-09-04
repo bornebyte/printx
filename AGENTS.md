@@ -9,7 +9,7 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - `frontend/components/ui/` — shadcn-style UI primitives. Reuse these primitives for new surfaces and keep the existing base-nova visual language.
 - `frontend/lib/` — browser-safe helpers, including Firebase Authentication REST integration and browser notification helpers.
 - `frontend/app/api/email/route.ts` — server-only Gmail SMTP notification endpoint using Node's built-in TLS API.
-- `backend/` — server-side Firebase-authenticated printer, job, and agent APIs.
+- `backend/` — server-side Firebase-authenticated printer, job, and agent APIs with Firestore persistence.
 - `agent/` — dependency-free, platform-independent Node.js background worker, local offline dashboard, printer adapter, and OS auto-start installers.
 
 ## Product behavior currently implemented
@@ -25,6 +25,7 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - The send flow only allows selecting printers already added to the user's list.
 - Documents up to 25 MB are sent in the authenticated job request, downloaded by the paired agent, and removed from the agent after processing; production storage should move to encrypted object storage and signed URLs.
 - A successful demo submission triggers a browser notification and attempts a confirmation email for signed-in users.
+- Structured backend data is persisted in Firebase Firestore by default; `PRINTX_STORAGE=local` is an explicit local-only fallback.
 - Demo codes are `PX-4812`, `PX-7390`, and `PX-1055`.
 
 ## Important implementation rules
@@ -39,6 +40,8 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - Treat the current printer directory as mock data. A production implementation must replace it with an authenticated API backed by the printer-code registry.
 - Backend endpoints must enforce the account role: users can save printers and create jobs; shopkeepers can register and manage their own printers.
 - Agent endpoints must authenticate the hashed one-time token and verify that every job belongs to the paired printer.
+- Keep Firestore service-account credentials server-only. Do not put `FIREBASE_SERVICE_ACCOUNT_FILE`, `FIREBASE_SERVICE_ACCOUNT_JSON`, or `FIREBASE_SERVICE_ACCOUNT_BASE64` in frontend environment files or client code.
+- The current Firestore adapter uses an MVP state document. Do not describe it as globally scalable; future work must split printers, users, jobs, and events into indexed per-entity collections with transactional updates.
 - Keep `agent/` platform-independent. Do not move OS-specific spooler commands into the worker core; isolate them in `agent/printer-adapter.mjs`.
 - Production agent backends must use HTTPS. The local agent dashboard must bind to loopback and require its local key for API actions.
 - Never commit `.env.local`, Gmail app passwords, Firebase service-account JSON, tokens, or uploaded document contents.
@@ -49,6 +52,7 @@ Use pnpm as the preferred package manager. From `/home/shubham/dev/printx`, use:
 
 ```bash
 pnpm install
+cp backend/.env.example backend/.env
 pnpm dev       # frontend + backend together
 pnpm dev:all   # frontend + backend + unpaired agent for local development
 pnpm agent:dev # agent only

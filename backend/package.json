@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "node --watch server.mjs",
     "start": "node server.mjs",
-    "lint": "node --check server.mjs",
-    "typecheck": "node --check server.mjs",
-    "build": "node --check server.mjs",
+    "lint": "node --check server.mjs && node --check firestore.mjs",
+    "typecheck": "node --check server.mjs && node --check firestore.mjs",
+    "build": "node --check server.mjs && node --check firestore.mjs",
     "test": "node --test"
   },
   "packageManager": "pnpm@10.33.2",

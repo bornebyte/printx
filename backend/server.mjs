@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { createFirestoreStore } from "./firestore.mjs";
 
 async function loadLocalEnv(file) {
   try {
@@ -29,6 +30,9 @@ const firebaseApiKey = process.env.FIREBASE_API_KEY ?? process.env.NEXT_PUBLIC_F
 const dataFile = resolve(process.env.PRINTX_DATA_FILE ?? "./data/store.json");
 const documentsDir = resolve(dirname(dataFile), "documents");
 const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
+const storageMode = String(process.env.PRINTX_STORAGE ?? "firestore").trim().toLowerCase();
+if (storageMode !== "firestore" && storageMode !== "local") throw new Error("PRINTX_STORAGE must be either firestore or local.");
+const firestoreStore = storageMode === "firestore" ? await createFirestoreStore() : null;
 
 const printerDirectory = new Map([
   ["PX-4812", {
@@ -80,23 +84,51 @@ function normalizePrinter(printer) {
   return { ...printer, currency, price: rawPrice.includes("/ page") ? rawPrice : formatPagePrice(rawPrice, currency) };
 }
 
-let store = { userPrinters: {}, printJobs: {}, profiles: {}, customPrinters: {}, printerOwners: {}, agents: {} };
+function emptyStore() {
+  return { userPrinters: {}, printJobs: {}, profiles: {}, customPrinters: {}, printerOwners: {}, agents: {} };
+}
+
+let store = emptyStore();
 let saveQueue = Promise.resolve();
 
+function normalizeStore(value) {
+  store = { ...emptyStore(), ...(value && typeof value === "object" ? value : {}) };
+  store.userPrinters ??= {};
+  store.printJobs ??= {};
+  store.profiles ??= {};
+  store.customPrinters ??= {};
+  store.printerOwners ??= {};
+  store.agents ??= {};
+  for (const [code, printer] of Object.entries(store.customPrinters)) {
+    if (!printer || typeof printer !== "object") continue;
+    const normalizedPrinter = normalizePrinter(printer);
+    store.customPrinters[code] = normalizedPrinter;
+    printerDirectory.set(code, normalizedPrinter);
+  }
+}
+
 async function loadStore() {
-  try {
-    store = JSON.parse(await readFile(dataFile, "utf8"));
-    store.userPrinters ??= {};
-    store.printJobs ??= {};
-    store.profiles ??= {};
-    store.customPrinters ??= {};
-    store.printerOwners ??= {};
-    store.agents ??= {};
-    for (const [code, printer] of Object.entries(store.customPrinters)) {
-      const normalizedPrinter = normalizePrinter(printer);
-      store.customPrinters[code] = normalizedPrinter;
-      printerDirectory.set(code, normalizedPrinter);
+  if (firestoreStore) {
+    const remoteStore = await firestoreStore.load();
+    if (remoteStore) {
+      normalizeStore(remoteStore);
+      return;
     }
+
+    // Migrate the former local JSON store once when the Firestore document is empty.
+    try {
+      normalizeStore(JSON.parse(await readFile(dataFile, "utf8")));
+      console.warn("Migrating the existing PrintX JSON store into Firestore.");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      normalizeStore();
+    }
+    await persistStore();
+    return;
+  }
+
+  try {
+    normalizeStore(JSON.parse(await readFile(dataFile, "utf8")));
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
     await persistStore();
@@ -105,6 +137,10 @@ async function loadStore() {
 
 function persistStore() {
   saveQueue = saveQueue.then(async () => {
+    if (firestoreStore) {
+      await firestoreStore.save(store);
+      return;
+    }
     await mkdir(dirname(dataFile), { recursive: true });
     await writeFile(dataFile, JSON.stringify(store, null, 2));
   });
@@ -472,6 +508,7 @@ async function handleRequest(request, response) {
 }
 
 await loadStore();
+console.log(`PrintX persistence: ${storageMode}`);
 createServer((request, response) => {
   handleRequest(request, response).catch((error) => {
     console.error("Unhandled backend error", error);

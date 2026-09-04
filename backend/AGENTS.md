@@ -13,9 +13,13 @@ Use pnpm for backend installs and scripts (`pnpm@10.33.2`). From the repository 
 - Agent tokens are stored as SHA-256 hashes in the backend store and must never be returned after initial issuance.
 - Agent job actions must verify both the paired printer ID and the agent ID that claimed the job.
 
-## Current state
+## Persistence and current state
 
-`firebase.ts` is an early placeholder and is not yet the production server boundary. The frontend currently uses Firebase Identity Toolkit REST endpoints for email/password sign-in and sign-up so the initial app does not need an additional browser SDK dependency.
+The backend defaults to Firebase Firestore (`PRINTX_STORAGE=firestore`). It uses the server-only service-account credential from `FIREBASE_SERVICE_ACCOUNT_FILE`, `FIREBASE_SERVICE_ACCOUNT_JSON`, or `FIREBASE_SERVICE_ACCOUNT_BASE64`; never send these values to the browser. The first Firestore adapter stores the structured MVP state in the `printx/state` document and migrates an existing `PRINTX_DATA_FILE` once when that document is empty. `PRINTX_STORAGE=local` is an explicit local-only fallback for development.
+
+The frontend currently uses Firebase Identity Toolkit REST endpoints for email/password sign-in and sign-up so the initial app does not need an additional browser SDK dependency. Job metadata, profiles, linked printers, shop registrations, ownership records, and agent credentials are persisted in Firestore. Uploaded document bytes remain a short-lived local backend handoff; production must move them to Firebase Storage or another encrypted object-storage layer because Firestore documents have strict size limits.
+
+The current state-document adapter is an MVP boundary, not the final billion-user data model. Before global scale, split data into Firestore collections with per-entity documents, transactions, indexes, retention policies, and a dedicated job/event model.
 
 ## Future service boundaries
 
