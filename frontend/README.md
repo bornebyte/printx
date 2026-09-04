@@ -5,13 +5,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -34,3 +28,34 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# PrintX frontend
+
+This is the initial PrintX web application: users start with an empty saved-printer list, add printer shops by their unique `PX-` code, review shop details, upload a document, and send a print job to a selected saved printer.
+
+The public home screen is available at `/`; the working printer-code dashboard is available at `/dashboard`.
+
+## Local setup
+
+Copy `.env.example` to `.env.local`. Set `NEXT_PUBLIC_FIREBASE_API_KEY` from the Firebase web app configuration, set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` from a Google OAuth web client, and enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them.
+
+The Gmail credentials are consumed only by `app/api/email/route.ts`, which uses Node's built-in TLS client to talk to Gmail SMTP. They must never use `NEXT_PUBLIC_*` variables.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Demo printer codes:
+
+- `PX-4812` — Northstar Studio
+- `PX-7390` — Paper Lane
+- `PX-1055` — Brooklyn Library
+
+The printer directory, file upload, and job submission are currently demo state. Replace them with authenticated APIs and Firebase Storage/Firestore for the production workflow.
+
+## Verification
+
+```bash
+pnpm lint
+pnpm build
+```
