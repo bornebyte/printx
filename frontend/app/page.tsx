@@ -74,6 +74,8 @@ export function WorkspaceDashboard() {
   const [codeError, setCodeError] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [documentData, setDocumentData] = useState<{ base64: string; contentType: string; size: number } | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(false);
   const [copies, setCopies] = useState(1);
   const [doubleSided, setDoubleSided] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -112,11 +114,25 @@ export function WorkspaceDashboard() {
     );
   }, [linkedPrinters, search]);
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
+      setDocumentData(null);
       setJobSubmitted(false);
+      if (file.size > 25 * 1024 * 1024) {
+        setApiError("Choose a document smaller than 25 MB.");
+        return;
+      }
+      setDocumentLoading(true);
+      try {
+        setDocumentData({ base64: await fileToBase64(file), contentType: file.type || "application/octet-stream", size: file.size });
+        setApiError("");
+      } catch {
+        setApiError("This document could not be prepared for secure delivery.");
+      } finally {
+        setDocumentLoading(false);
+      }
     }
   }
 
@@ -154,7 +170,7 @@ export function WorkspaceDashboard() {
   }
 
   async function submitJob() {
-    if (!authSession || !selectedPrinter || !fileName) return;
+    if (!authSession || !selectedPrinter || !fileName || !documentData || documentLoading) return;
     void requestPrintNotifications();
     setIsSubmitting(true);
     setApiError("");
@@ -164,6 +180,7 @@ export function WorkspaceDashboard() {
         fileName,
         copies,
         doubleSided,
+        document: documentData,
       });
       setIsSubmitting(false);
       setJobSubmitted(true);
@@ -301,6 +318,19 @@ function SavedPrinterRow({ printer, selected, onSelect, onRemove }: { printer: P
 
 function accentClass(accent: string) {
   return accent === "lavender" ? "bg-[#eeeafd] text-[#766bb3]" : accent === "peach" ? "bg-[#fcebe4] text-[#c06f55]" : "bg-[#e2eef7] text-[#4f7ea5]";
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") { reject(new Error("Document encoding failed.")); return; }
+      resolve(result.split(",", 2)[1] ?? "");
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Document reading failed."));
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function Home() {

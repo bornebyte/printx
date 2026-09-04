@@ -30,7 +30,7 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # PrintX frontend
 
-This is the initial PrintX web application: users start with an empty saved-printer list, add printer shops by their unique `PX-` code, review shop details, upload a document, and send a print job to a selected saved printer.
+This is the initial PrintX web application: users start with an empty saved-printer list, add printer shops by their unique `PX-` code, review shop details, upload a document up to 25 MB, and send a print job to a selected saved printer.
 
 The public home screen is available at `/`; `/dashboard` is auth-gated and routes regular print users to saved-printer printing and printer shopkeepers to printer registration.
 

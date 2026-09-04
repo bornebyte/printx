@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { printDocument } from "./printer-adapter.mjs";
@@ -96,6 +96,19 @@ function backendRequest(path, init = {}) {
   });
 }
 
+async function downloadDocument(jobId) {
+  const response = await fetch(new URL(`/api/agent/jobs/${encodeURIComponent(jobId)}/document`, backendUrl), {
+    headers: { Authorization: `Bearer ${state.agentToken}`, "User-Agent": "PrintX-Agent/0.1" },
+  });
+  if (!response.ok) throw new Error(`PrintX document download failed (${response.status}).`);
+  const fileName = state.jobs[jobId]?.fileName ?? "document.bin";
+  const extension = fileName.match(/\.[a-z0-9]{1,8}$/i)?.[0].toLowerCase() ?? ".bin";
+  const documentPath = resolve(agentDir, "data", "documents", `${jobId}${extension}`);
+  await mkdir(dirname(documentPath), { recursive: true });
+  await writeFile(documentPath, Buffer.from(await response.arrayBuffer()), { mode: 0o600 });
+  return documentPath;
+}
+
 function mergeJobs(jobs) {
   const pendingIds = new Set(state.pendingActions.map((action) => action.jobId));
   for (const job of jobs) {
@@ -123,10 +136,15 @@ async function processNextJob() {
   const job = Object.values(state.jobs).find((candidate) => candidate.status === "queued");
   if (!job) return;
   processing = true;
+  let localDocumentPath = "";
   try {
     const claimed = await backendRequest(`/api/agent/jobs/${encodeURIComponent(job.id)}/claim`, { method: "POST" });
     state.jobs[job.id] = { ...state.jobs[job.id], ...claimed.job, localStatus: "processing" };
     await persistState();
+    if (state.jobs[job.id].documentAvailable) {
+      localDocumentPath = await downloadDocument(job.id);
+      state.jobs[job.id] = { ...state.jobs[job.id], documentPath: localDocumentPath };
+    }
     await printDocument(state.jobs[job.id], { mode: printerMode, printerName });
     if (state.jobs[job.id].cancelRequested || state.jobs[job.id].status === "cancelled") {
       const cancelled = await backendRequest(`/api/agent/jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
@@ -146,6 +164,8 @@ async function processNextJob() {
     }
     state.lastError = message;
   } finally {
+    if (localDocumentPath) { try { await unlink(localDocumentPath); } catch { /* The file may already be gone. */ } }
+    if (state.jobs[job.id]) delete state.jobs[job.id].documentPath;
     processing = false;
     await persistState();
   }

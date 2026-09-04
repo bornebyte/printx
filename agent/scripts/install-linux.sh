@@ -25,5 +25,6 @@ SERVICE
 
 systemctl --user daemon-reload
 systemctl --user enable --now printx-agent.service
+loginctl enable-linger "$USER" 2>/dev/null || true
 echo "PrintX Agent installed and started as a systemd user service."
 echo "Logs: journalctl --user -u printx-agent.service -f"

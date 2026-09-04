@@ -2,7 +2,7 @@
 
 PrintX is a global printer-sharing network. People and businesses can register physical printers, share them with a unique printer code, and let others securely send print jobs from anywhere.
 
-> PrintX is currently an early web MVP. The user flow, backend queue, and first cross-platform printer-agent foundation are functional, while secure document transfer, payments, and production printer drivers are still being built.
+> PrintX is currently an early web MVP. The user flow, backend queue, secure initial document handoff, and first cross-platform printer-agent foundation are functional, while production encrypted storage, payments, and printer drivers are still being built.
 
 ## Current MVP
 
@@ -121,7 +121,7 @@ The next production milestones are:
 1. Replace the mock printer directory with an authenticated printer-code registry.
 2. Persist user-linked printers in Firestore with ownership and access rules.
 3. Add Firebase Storage upload, document encryption, retention, and malware scanning.
-4. Add secure document upload/download to the agent job envelope; the current MVP sends a filename and print settings only.
+4. Move the initial 25 MB document handoff to encrypted object storage with short-lived signed URLs and retention controls.
 5. Add print-job state transitions, payments, owner controls, and audit logs.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before making changes. Security concerns belong in a private GitHub Security Advisory; do not open a public issue for a vulnerability.

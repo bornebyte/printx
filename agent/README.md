@@ -11,6 +11,7 @@ The PrintX Agent is a platform-independent background worker for a computer conn
 - Provides an offline dashboard at `http://127.0.0.1:47821`.
 - Supports pause, resume, cancel, retry, and status inspection locally.
 - Uses a safe mock adapter by default and isolates OS spooler commands in `printer-adapter.mjs`.
+- Downloads the authenticated document payload only while processing, then removes the local temporary file.
 
 The agent does not open a public inbound port. The backend sends no unsolicited connection to the computer; the agent always initiates the secure request. Use HTTPS for `PRINTX_BACKEND_URL` outside localhost development.
 
@@ -49,7 +50,7 @@ On Windows, run `agent/scripts/install-windows.ps1` from PowerShell. These creat
 
 ## Printer modes
 
-`mock` is the default and exercises the complete queue lifecycle without printing. `system` delegates to the host spooler (`lp` on Linux/macOS and the Windows Print verb), but the current web MVP does not transfer document bytes yet. A secure document payload/download endpoint must be added before using `system` mode for real jobs.
+`mock` is the default and exercises the complete queue lifecycle without printing. `system` delegates to the host spooler (`lp` on Linux/macOS and the Windows Print verb). The current MVP transfers documents through an authenticated backend endpoint up to 25 MB; production should replace this with encrypted object storage and short-lived signed URLs before global rollout.
 
 ## Commands
 

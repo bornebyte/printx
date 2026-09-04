@@ -80,7 +80,7 @@ export async function removeSavedPrinter(session: AuthSession, printerId: string
   await apiRequest<Record<string, never>>(`/api/me/printers/${encodeURIComponent(printerId)}`, session, { method: "DELETE" });
 }
 
-export async function createPrintJob(session: AuthSession, input: { printerId: string; fileName: string; copies: number; doubleSided: boolean }) {
+export async function createPrintJob(session: AuthSession, input: { printerId: string; fileName: string; copies: number; doubleSided: boolean; document: { base64: string; contentType: string; size: number } }) {
   const data = await apiRequest<{ job: PrintJob }>("/api/print-jobs", session, {
     method: "POST",
     body: JSON.stringify(input),

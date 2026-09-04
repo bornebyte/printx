@@ -23,7 +23,7 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - The agent keeps a local queue/dashboard and supports pause, cancel, retry, recovery, and OS startup installation.
 - Adding a valid code reveals the shop name, owner, address, availability, printer type, capabilities, rating, pricing, and turnaround estimate.
 - The send flow only allows selecting printers already added to the user's list.
-- Document selection is currently local UI state; no file is uploaded to storage yet.
+- Documents up to 25 MB are sent in the authenticated job request, downloaded by the paired agent, and removed from the agent after processing; production storage should move to encrypted object storage and signed URLs.
 - A successful demo submission triggers a browser notification and attempts a confirmation email for signed-in users.
 - Demo codes are `PX-4812`, `PX-7390`, and `PX-1055`.
 

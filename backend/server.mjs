@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 async function loadLocalEnv(file) {
@@ -27,6 +27,7 @@ const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? "0.0.0.0";
 const firebaseApiKey = process.env.FIREBASE_API_KEY ?? process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const dataFile = resolve(process.env.PRINTX_DATA_FILE ?? "./data/store.json");
+const documentsDir = resolve(dirname(dataFile), "documents");
 const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
 
 const printerDirectory = new Map([
@@ -120,12 +121,12 @@ function noContent(response) {
   response.end();
 }
 
-function readBody(request) {
+function readBody(request, maxBytes = 1_000_000) {
   return new Promise((resolveBody, reject) => {
     let body = "";
     request.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > maxBytes) {
         reject(new Error("Request body is too large."));
         request.destroy();
       }
@@ -197,7 +198,15 @@ async function requireAgent(request, response) {
 }
 
 function publicJob(job) {
-  return { id: job.id, printerId: job.printerId, printerCode: job.printerCode, printerName: job.printerName, fileName: job.fileName, copies: job.copies, doubleSided: job.doubleSided, status: job.status, createdAt: job.createdAt, updatedAt: job.updatedAt };
+  return { id: job.id, printerId: job.printerId, printerCode: job.printerCode, printerName: job.printerName, fileName: job.fileName, copies: job.copies, doubleSided: job.doubleSided, status: job.status, documentAvailable: Boolean(job.documentPath), createdAt: job.createdAt, updatedAt: job.updatedAt };
+}
+
+async function removeJobDocument(job) {
+  if (!job.documentPath) return;
+  const documentPath = job.documentPath;
+  delete job.documentPath;
+  delete job.documentContentType;
+  try { await unlink(documentPath); } catch (error) { if (error.code !== "ENOENT") console.error("Could not remove PrintX job document", error); }
 }
 
 function updateJobStatus(jobId, status) {
@@ -205,6 +214,7 @@ function updateJobStatus(jobId, status) {
   if (!job) return;
   job.status = status;
   job.updatedAt = new Date().toISOString();
+  if (status === "ready") void removeJobDocument(job).then(() => persistStore());
   void persistStore();
 }
 
@@ -248,6 +258,20 @@ async function handleAgentRequest(request, response, url) {
     return true;
   }
 
+  const agentDocumentMatch = url.pathname.match(/^\/api\/agent\/jobs\/([^/]+)\/document$/);
+  if (request.method === "GET" && agentDocumentMatch) {
+    const job = store.printJobs[agentDocumentMatch[1]];
+    if (!job || job.printerId !== agent.printerId || !job.documentPath) { json(response, 404, { error: "Agent document not found." }); return true; }
+    try {
+      const document = await readFile(job.documentPath);
+      response.writeHead(200, { "Content-Type": job.documentContentType ?? "application/octet-stream", "Content-Length": document.byteLength, "Cache-Control": "no-store" });
+      response.end(document);
+    } catch (error) {
+      json(response, error.code === "ENOENT" ? 404 : 500, { error: error.code === "ENOENT" ? "Agent document not found." : "Could not read agent document." });
+    }
+    return true;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/agent/jobs") {
     const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 20));
     const jobs = Object.values(store.printJobs)
@@ -286,6 +310,7 @@ async function handleAgentRequest(request, response, url) {
       job.agentId = null;
     }
     job.updatedAt = new Date().toISOString();
+    if (action === "complete") await removeJobDocument(job);
     await persistStore();
     json(response, 200, { job: publicAgentJob(job) });
     return true;
@@ -416,13 +441,25 @@ async function handleRequest(request, response) {
   if (request.method === "POST" && url.pathname === "/api/print-jobs") {
     if (user.role !== "user") { json(response, 403, { error: "Switch to a print user account to send print jobs." }); return; }
     try {
-      const body = await readBody(request);
+      const body = await readBody(request, 36_000_000);
       const printer = linkedPrintersFor(user.uid).find((item) => item.id === body.printerId);
       if (!printer) { json(response, 422, { error: "Choose a saved printer before sending a job." }); return; }
       const fileName = String(body.fileName ?? "").trim();
       if (!fileName) { json(response, 422, { error: "A document is required." }); return; }
+      let documentBuffer = null;
+      let documentContentType = "application/octet-stream";
+      if (body.document) {
+        const base64 = String(body.document.base64 ?? "");
+        documentContentType = String(body.document.contentType ?? documentContentType).slice(0, 120);
+        if (!base64 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) { json(response, 422, { error: "The document payload is invalid." }); return; }
+        documentBuffer = Buffer.from(base64, "base64");
+        if (!documentBuffer.byteLength || documentBuffer.byteLength > 25 * 1024 * 1024) { json(response, 422, { error: "The document must be between 1 byte and 25 MB." }); return; }
+      }
       const now = new Date().toISOString();
-      const job = { id: randomUUID(), uid: user.uid, printerId: printer.id, printerCode: printer.code, printerName: printer.name, fileName: fileName.slice(0, 240), copies: Math.max(1, Math.min(99, Number(body.copies) || 1)), doubleSided: Boolean(body.doubleSided), status: "queued", createdAt: now, updatedAt: now };
+      const jobId = randomUUID();
+      const extension = fileName.match(/\.[a-z0-9]{1,8}$/i)?.[0].toLowerCase() ?? ".bin";
+      const job = { id: jobId, uid: user.uid, printerId: printer.id, printerCode: printer.code, printerName: printer.name, fileName: fileName.slice(0, 240), copies: Math.max(1, Math.min(99, Number(body.copies) || 1)), doubleSided: Boolean(body.doubleSided), ...(documentBuffer ? { documentPath: resolve(documentsDir, `${jobId}${extension}`), documentContentType } : {}), status: "queued", createdAt: now, updatedAt: now };
+      if (documentBuffer) { await mkdir(documentsDir, { recursive: true }); await writeFile(job.documentPath, documentBuffer, { mode: 0o600 }); }
       store.printJobs[job.id] = job;
       await persistStore();
       if (!agentForPrinter(printer.id)) scheduleJob(job.id);

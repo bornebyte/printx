@@ -29,4 +29,4 @@ pnpm --dir agent test
 - `agent.mjs` owns polling, persistent state, the loopback API, and the offline dashboard.
 - `printer-adapter.mjs` is the only printer-specific boundary. Keep the default `mock` adapter safe for development and isolate OS spooler commands in the `system` adapter.
 - The backend owns job truth. The agent must recover abandoned processing jobs after restart and must not invent job IDs.
-- The current web MVP sends a filename and print options, not document bytes. Do not claim that the agent can print arbitrary documents until secure document download/upload is implemented.
+- The current web MVP sends a document payload up to 25 MB through the authenticated job API. Keep the agent's local document temporary, remove it after processing, and move production delivery to encrypted object storage with short-lived signed URLs.
