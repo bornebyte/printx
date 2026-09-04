@@ -10,6 +10,8 @@ Use pnpm for backend installs and scripts (`pnpm@10.33.2`). From the repository 
 - Gmail delivery is implemented in the Next.js server route with Node's built-in `node:tls` module. Do not add a third-party email SDK for this requirement.
 - Firebase client configuration may be exposed to the browser, but Firebase Admin credentials and user tokens must never be sent to the client.
 - Validate authenticated user identity and printer ownership before production reads/writes.
+- Agent tokens are stored as SHA-256 hashes in the backend store and must never be returned after initial issuance.
+- Agent job actions must verify both the paired printer ID and the agent ID that claimed the job.
 
 ## Current state
 
@@ -21,3 +23,4 @@ Use pnpm for backend installs and scripts (`pnpm@10.33.2`). From the repository 
 - User-linked printers: authenticated user ID to printer-code relationship.
 - Print jobs: encrypted document reference, selected printer, settings, status timeline, and audit events.
 - Notifications: browser notification plus Gmail confirmation, with retries and delivery status.
+- Printer agents: one-time owner-issued token, outbound polling, claim/complete/fail/retry/cancel lifecycle, and restart recovery.

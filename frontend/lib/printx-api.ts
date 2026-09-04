@@ -26,7 +26,7 @@ export type PrintJob = {
   fileName: string;
   copies: number;
   doubleSided: boolean;
-  status: "queued" | "processing" | "ready";
+  status: "queued" | "processing" | "ready" | "failed" | "cancelled";
   createdAt: string;
   updatedAt: string;
 };
@@ -104,4 +104,11 @@ export async function registerOwnerPrinter(session: AuthSession, input: OwnerPri
     body: JSON.stringify(input),
   });
   return data.printer;
+}
+
+export async function createOwnerAgentToken(session: AuthSession, printerId: string) {
+  const data = await apiRequest<{ agent: { id: string; printerId: string }; agentToken: string; printer: { id: string; code: string; name: string } }>(`/api/owner/printers/${encodeURIComponent(printerId)}/agent-token`, session, {
+    method: "POST",
+  });
+  return data;
 }

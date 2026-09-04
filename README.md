@@ -2,7 +2,7 @@
 
 PrintX is a global printer-sharing network. People and businesses can register physical printers, share them with a unique printer code, and let others securely send print jobs from anywhere.
 
-> PrintX is currently an early web MVP. The user flow and interface are functional, while the printer registry, file storage, payments, and printer-agent network are still being built.
+> PrintX is currently an early web MVP. The user flow, backend queue, and first cross-platform printer-agent foundation are functional, while secure document transfer, payments, and production printer drivers are still being built.
 
 ## Current MVP
 
@@ -16,6 +16,8 @@ PrintX is a global printer-sharing network. People and businesses can register p
 - Separate print-user and printer-shopkeeper account flows
 - Shopkeeper printer registration with generated shareable `PX-` codes
 - Shopkeeper pricing with selectable local currency (USD, INR, EUR, GBP, AED, CAD, AUD, SGD, or JPY)
+- Cross-platform background agent with secure outbound job polling and an offline localhost dashboard
+- Linux systemd, macOS LaunchAgent, and Windows logon-task auto-start installers
 - Optional browser notifications for print-job updates
 - Optional Gmail SMTP confirmation email using a Google app password and Node's built-in TLS API
 - Responsive shadcn-style interface for desktop and mobile browsers
@@ -38,7 +40,8 @@ printx/
 │   ├── app/api/email/        # Server-only Gmail SMTP route
 │   ├── components/ui/        # shadcn-style UI primitives
 │   └── lib/                  # Firebase Auth and browser notification helpers
-├── backend/                  # Reserved for server-side platform services
+├── backend/                  # Authenticated printer, job, and agent APIs
+├── agent/                    # Platform-independent background worker and local UI
 ├── .github/                  # CI, issue templates, and pull request template
 └── AGENTS.md                 # Project instructions for coding agents
 ```
@@ -57,6 +60,22 @@ This starts both services from the repository root:
 
 - Frontend: [http://localhost:3000](http://localhost:3000)
 - Backend: [http://localhost:4000/health](http://localhost:4000/health)
+
+To run the agent during development as well:
+
+```bash
+cp agent/.env.example agent/.env
+pnpm dev:all
+```
+
+The agent dashboard is available at [http://127.0.0.1:47821](http://127.0.0.1:47821). Pair a registered printer from the owner dashboard, copy the generated values into `agent/.env`, and restart the agent. For automatic startup, use the installer matching the computer:
+
+```bash
+bash agent/scripts/install-linux.sh       # Linux
+bash agent/scripts/install-macos.sh       # macOS
+```
+
+On Windows, run `agent/scripts/install-windows.ps1` in PowerShell. All three installers launch the same platform-independent `agent/agent.mjs` process.
 
 Run checks before opening a pull request:
 
@@ -102,7 +121,7 @@ The next production milestones are:
 1. Replace the mock printer directory with an authenticated printer-code registry.
 2. Persist user-linked printers in Firestore with ownership and access rules.
 3. Add Firebase Storage upload, document encryption, retention, and malware scanning.
-4. Build the desktop/mobile printer agent and secure job delivery protocol.
+4. Add secure document upload/download to the agent job envelope; the current MVP sends a filename and print settings only.
 5. Add print-job state transitions, payments, owner controls, and audit logs.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before making changes. Security concerns belong in a private GitHub Security Advisory; do not open a public issue for a vulnerability.

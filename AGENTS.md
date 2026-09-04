@@ -9,7 +9,8 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - `frontend/components/ui/` — shadcn-style UI primitives. Reuse these primitives for new surfaces and keep the existing base-nova visual language.
 - `frontend/lib/` — browser-safe helpers, including Firebase Authentication REST integration and browser notification helpers.
 - `frontend/app/api/email/route.ts` — server-only Gmail SMTP notification endpoint using Node's built-in TLS API.
-- `backend/` — reserved for server-side Firebase and future printer/job services.
+- `backend/` — server-side Firebase-authenticated printer, job, and agent APIs.
+- `agent/` — dependency-free, platform-independent Node.js background worker, local offline dashboard, printer adapter, and OS auto-start installers.
 
 ## Product behavior currently implemented
 
@@ -17,6 +18,9 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - Authentication separates regular print users from printer shopkeepers; each role gets its own workspace.
 - Printer shops are added by their unique `PX-` code, not by generic map search.
 - Shopkeepers can register a physical printer and receive a generated unique code.
+- Shopkeepers can issue a one-time hashed agent token for each registered printer.
+- The agent polls outbound over its configured backend URL, so no public inbound port is required.
+- The agent keeps a local queue/dashboard and supports pause, cancel, retry, recovery, and OS startup installation.
 - Adding a valid code reveals the shop name, owner, address, availability, printer type, capabilities, rating, pricing, and turnaround estimate.
 - The send flow only allows selecting printers already added to the user's list.
 - Document selection is currently local UI state; no file is uploaded to storage yet.
@@ -34,6 +38,9 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - Use the existing shadcn-style primitives before creating one-off controls. Prefer `Button` and `Card` from `frontend/components/ui/` and add narrowly scoped primitives only when they are reused.
 - Treat the current printer directory as mock data. A production implementation must replace it with an authenticated API backed by the printer-code registry.
 - Backend endpoints must enforce the account role: users can save printers and create jobs; shopkeepers can register and manage their own printers.
+- Agent endpoints must authenticate the hashed one-time token and verify that every job belongs to the paired printer.
+- Keep `agent/` platform-independent. Do not move OS-specific spooler commands into the worker core; isolate them in `agent/printer-adapter.mjs`.
+- Production agent backends must use HTTPS. The local agent dashboard must bind to loopback and require its local key for API actions.
 - Never commit `.env.local`, Gmail app passwords, Firebase service-account JSON, tokens, or uploaded document contents.
 
 ## Verification
@@ -43,10 +50,12 @@ Use pnpm as the preferred package manager. From `/home/shubham/dev/printx`, use:
 ```bash
 pnpm install
 pnpm dev       # frontend + backend together
+pnpm dev:all   # frontend + backend + unpaired agent for local development
+pnpm agent:dev # agent only
 pnpm lint      # both packages
 pnpm typecheck # both packages
 pnpm build     # both packages
-pnpm test      # backend tests
+pnpm test      # backend + agent tests
 pnpm check     # lint + typecheck + build
 ```
 

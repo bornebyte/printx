@@ -5,10 +5,13 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "dev": "pnpm --parallel --filter ./frontend --filter ./backend dev",
-    "lint": "pnpm --filter ./frontend lint && pnpm --filter ./backend lint",
-    "typecheck": "pnpm --filter ./frontend typecheck && pnpm --filter ./backend typecheck",
-    "build": "pnpm --filter ./frontend build && pnpm --filter ./backend build",
-    "test": "pnpm --filter ./backend test",
+    "dev:all": "pnpm --parallel --filter ./frontend --filter ./backend --filter ./agent dev",
+    "agent": "pnpm --dir agent start",
+    "agent:dev": "pnpm --dir agent dev",
+    "lint": "pnpm --filter ./frontend lint && pnpm --filter ./backend lint && pnpm --filter ./agent lint",
+    "typecheck": "pnpm --filter ./frontend typecheck && pnpm --filter ./backend typecheck && pnpm --filter ./agent typecheck",
+    "build": "pnpm --filter ./frontend build && pnpm --filter ./backend build && pnpm --filter ./agent build",
+    "test": "pnpm --filter ./backend test && pnpm --filter ./agent test",
     "check": "pnpm lint && pnpm typecheck && pnpm build"
   }
 }

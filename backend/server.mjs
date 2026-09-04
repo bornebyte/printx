@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
@@ -79,7 +79,7 @@ function normalizePrinter(printer) {
   return { ...printer, currency, price: rawPrice.includes("/ page") ? rawPrice : formatPagePrice(rawPrice, currency) };
 }
 
-let store = { userPrinters: {}, printJobs: {}, profiles: {}, customPrinters: {}, printerOwners: {} };
+let store = { userPrinters: {}, printJobs: {}, profiles: {}, customPrinters: {}, printerOwners: {}, agents: {} };
 let saveQueue = Promise.resolve();
 
 async function loadStore() {
@@ -90,6 +90,7 @@ async function loadStore() {
     store.profiles ??= {};
     store.customPrinters ??= {};
     store.printerOwners ??= {};
+    store.agents ??= {};
     for (const [code, printer] of Object.entries(store.customPrinters)) {
       const normalizedPrinter = normalizePrinter(printer);
       store.customPrinters[code] = normalizedPrinter;
@@ -167,6 +168,34 @@ async function requireUser(request, response) {
 
 function linkedPrintersFor(uid) { return store.userPrinters[uid] ?? []; }
 
+function hashAgentToken(token) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function agentForPrinter(printerId) {
+  return Object.values(store.agents).find((agent) => agent.enabled && agent.printerId === printerId);
+}
+
+function publicAgent(agent) {
+  return { id: agent.id, printerId: agent.printerId, createdAt: agent.createdAt, lastSeenAt: agent.lastSeenAt ?? null, enabled: agent.enabled };
+}
+
+async function authenticateAgent(request) {
+  const token = tokenFrom(request);
+  if (!token) return null;
+  const tokenHash = hashAgentToken(token);
+  const agent = Object.values(store.agents).find((candidate) => candidate.enabled && candidate.tokenHash === tokenHash);
+  if (!agent) return null;
+  agent.lastSeenAt = new Date().toISOString();
+  return agent;
+}
+
+async function requireAgent(request, response) {
+  const agent = await authenticateAgent(request);
+  if (!agent) { json(response, 401, { error: "Valid printer agent credentials are required." }); return null; }
+  return agent;
+}
+
 function publicJob(job) {
   return { id: job.id, printerId: job.printerId, printerCode: job.printerCode, printerName: job.printerName, fileName: job.fileName, copies: job.copies, doubleSided: job.doubleSided, status: job.status, createdAt: job.createdAt, updatedAt: job.updatedAt };
 }
@@ -184,6 +213,88 @@ function scheduleJob(jobId) {
   setTimeout(() => updateJobStatus(jobId, "ready"), 8_000);
 }
 
+function publicAgentJob(job) {
+  return { ...publicJob(job), agentId: job.agentId ?? null };
+}
+
+async function handleAgentRequest(request, response, url) {
+  const agent = await requireAgent(request, response);
+  if (!agent) return true;
+
+  if (request.method === "GET" && url.pathname === "/api/agent/status") {
+    const printer = printerDirectory.get(Object.keys(store.customPrinters).find((code) => store.customPrinters[code].id === agent.printerId) ?? "");
+    json(response, 200, { agent: publicAgent(agent), printer: printer ? { id: printer.id, code: printer.code, name: printer.name } : null });
+    return true;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/agent/heartbeat") {
+    await persistStore();
+    json(response, 200, { ok: true, agent: publicAgent(agent) });
+    return true;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/agent/recover") {
+    let recovered = 0;
+    for (const job of Object.values(store.printJobs)) {
+      if (job.agentId === agent.id && job.status === "processing") {
+        job.status = "queued";
+        job.agentId = null;
+        job.updatedAt = new Date().toISOString();
+        recovered += 1;
+      }
+    }
+    await persistStore();
+    json(response, 200, { recovered });
+    return true;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/agent/jobs") {
+    const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 20));
+    const jobs = Object.values(store.printJobs)
+      .filter((job) => job.printerId === agent.printerId && (job.status === "queued" || (job.status === "processing" && job.agentId === agent.id)))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .slice(0, limit);
+    json(response, 200, { jobs: jobs.map(publicAgentJob) });
+    return true;
+  }
+
+  const jobAction = url.pathname.match(/^\/api\/agent\/jobs\/([^/]+)\/(claim|complete|fail|retry|cancel)$/);
+  if (request.method === "POST" && jobAction) {
+    const [, jobId, action] = jobAction;
+    const job = store.printJobs[jobId];
+    if (!job || job.printerId !== agent.printerId) { json(response, 404, { error: "Agent job not found." }); return true; }
+    if (action === "claim") {
+      if (job.status !== "queued" && !(job.status === "processing" && job.agentId === agent.id)) { json(response, 409, { error: "This job is not available to claim." }); return true; }
+      job.status = "processing";
+      job.agentId = agent.id;
+    } else if (action === "complete") {
+      if (job.status !== "processing" || job.agentId !== agent.id) { json(response, 409, { error: "Only a processing job owned by this agent can be completed." }); return true; }
+      job.status = "ready";
+    } else if (action === "fail") {
+      if (job.status !== "processing" || job.agentId !== agent.id) { json(response, 409, { error: "Only a processing job owned by this agent can be failed." }); return true; }
+      job.status = "failed";
+      job.error = "The local printer agent could not process this job.";
+    } else if (action === "retry") {
+      if (job.status !== "failed" && job.status !== "cancelled") { json(response, 409, { error: "Only failed or cancelled jobs can be retried." }); return true; }
+      job.status = "queued";
+      job.agentId = null;
+      delete job.error;
+    } else if (action === "cancel") {
+      if (job.status === "cancelled") { json(response, 200, { job: publicAgentJob(job) }); return true; }
+      if (job.status !== "queued" && !(job.status === "processing" && job.agentId === agent.id)) { json(response, 409, { error: "This job cannot be cancelled now." }); return true; }
+      job.status = "cancelled";
+      job.agentId = null;
+    }
+    job.updatedAt = new Date().toISOString();
+    await persistStore();
+    json(response, 200, { job: publicAgentJob(job) });
+    return true;
+  }
+
+  json(response, 404, { error: "Agent route not found." });
+  return true;
+}
+
 async function handleRequest(request, response) {
   if (request.method === "OPTIONS") {
     response.writeHead(204, { "Access-Control-Allow-Origin": allowedOrigin, "Access-Control-Allow-Credentials": "true", "Access-Control-Allow-Headers": "Authorization, Content-Type, X-PrintX-User-Id", "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS", Vary: "Origin" });
@@ -193,6 +304,7 @@ async function handleRequest(request, response) {
 
   const url = new URL(request.url, `http://${request.headers.host ?? "localhost"}`);
   if (request.method === "GET" && url.pathname === "/health") { json(response, 200, { ok: true, service: "printx-backend", time: new Date().toISOString() }); return; }
+  if (url.pathname.startsWith("/api/agent/")) { await handleAgentRequest(request, response, url); return; }
   const user = await requireUser(request, response);
   if (!user) return;
 
@@ -241,6 +353,24 @@ async function handleRequest(request, response) {
       await persistStore();
       json(response, 201, { printer });
     } catch (error) { json(response, 400, { error: error.message }); }
+    return;
+  }
+
+  const agentTokenMatch = url.pathname.match(/^\/api\/owner\/printers\/([^/]+)\/agent-token$/);
+  if (request.method === "POST" && agentTokenMatch) {
+    if (user.role !== "owner") { json(response, 403, { error: "Choose the printer shopkeeper account type to connect an agent." }); return; }
+    const printerId = decodeURIComponent(agentTokenMatch[1]);
+    if (store.printerOwners[printerId] !== user.uid) { json(response, 404, { error: "Printer not found in your owner workspace." }); return; }
+    const printer = Object.values(store.customPrinters).find((candidate) => candidate.id === printerId);
+    if (!printer) { json(response, 404, { error: "Printer not found." }); return; }
+    for (const agent of Object.values(store.agents)) {
+      if (agent.printerId === printerId) agent.enabled = false;
+    }
+    const agentId = randomUUID();
+    const agentToken = `pxa_${randomBytes(32).toString("base64url")}`;
+    store.agents[agentId] = { id: agentId, printerId, ownerUid: user.uid, tokenHash: hashAgentToken(agentToken), createdAt: new Date().toISOString(), enabled: true };
+    await persistStore();
+    json(response, 201, { agent: publicAgent(store.agents[agentId]), agentToken, printer: { id: printer.id, code: printer.code, name: printer.name } });
     return;
   }
 
@@ -295,7 +425,7 @@ async function handleRequest(request, response) {
       const job = { id: randomUUID(), uid: user.uid, printerId: printer.id, printerCode: printer.code, printerName: printer.name, fileName: fileName.slice(0, 240), copies: Math.max(1, Math.min(99, Number(body.copies) || 1)), doubleSided: Boolean(body.doubleSided), status: "queued", createdAt: now, updatedAt: now };
       store.printJobs[job.id] = job;
       await persistStore();
-      scheduleJob(job.id);
+      if (!agentForPrinter(printer.id)) scheduleJob(job.id);
       json(response, 201, { job: publicJob(job) });
     } catch (error) { json(response, 400, { error: error.message }); }
     return;

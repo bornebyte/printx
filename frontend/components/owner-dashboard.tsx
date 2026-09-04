@@ -2,11 +2,11 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Bell, LogOut, MapPin, Plus, Printer, Settings2, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Bell, Check, Copy, Link2, LogOut, MapPin, Plus, Printer, Settings2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { clearAuthSession, type AuthSession } from "@/lib/firebase-auth";
-import { getOwnerPrinters, registerOwnerPrinter } from "@/lib/printx-api";
+import { createOwnerAgentToken, getOwnerPrinters, registerOwnerPrinter, type PrinterShop } from "@/lib/printx-api";
 
 const currencyOptions = [
   ["USD", "US Dollar"],
@@ -100,12 +100,46 @@ export function OwnerDashboard({ session, onSignOut }: OwnerDashboardProps) {
             {loadingList ? <div className="px-5 py-12 text-center text-xs text-[#8b9aa2]">Loading your printers…</div> : printers.length === 0 ? <div className="px-5 py-14 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef6f7] text-[#528594]"><Printer size={25} strokeWidth={1.4} /></div><p className="mt-4 text-sm font-semibold text-[#405460]">No printers registered yet</p><p className="mx-auto mt-2 max-w-[360px] text-xs leading-5 text-[#8b9aa2]">Register your first physical printer to receive its shareable PrintX code.</p><button onClick={() => setIsModalOpen(true)} className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-[#b6cfd6] px-3.5 text-xs font-semibold text-[#2e697a] hover:bg-[#eef7f8]"><Plus size={14} /> Register first printer</button></div> : <div className="divide-y divide-[#edf1f3]">{printers.map((printer) => <div key={printer.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e2eef7] text-xs font-bold text-[#4f7ea5]">{printer.initials}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-[13px] font-semibold text-[#304650]">{printer.name}</p><span className="rounded-full bg-[#e9f8ef] px-2 py-0.5 text-[9px] font-semibold text-[#25824d]">Available</span></div><p className="mt-1 flex items-center gap-1 text-[11px] text-[#8b9aa2]"><MapPin size={11} /> {printer.address}</p></div></div><div className="flex items-center gap-3 pl-[52px] sm:pl-0"><span className="font-semibold text-[#365b6b]">{printer.price}</span><span className="rounded-md bg-[#f1f5f6] px-2.5 py-1.5 font-mono text-xs font-semibold tracking-[.08em] text-[#52717d]">{printer.code}</span><span className="hidden text-[10px] text-[#809099] md:block">Share this code</span><ArrowUpRight size={15} className="text-[#afbdc3]" /></div></div>)}</div>}
           </CardContent>
         </Card>
+        <AgentConnector session={session} printers={printers} />
         <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#d8e6ea] bg-[#eef7f8] p-4"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[#2e7182] shadow-sm"><ShieldCheck size={17} /></div><div><p className="text-xs font-semibold text-[#2c5362]">You control every connection</p><p className="mt-1 text-[11px] leading-5 text-[#70909b]">Set your availability and pricing before the code is shared. Customers only see the printer details you publish.</p></div></div>
       </section>
 
       {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18313d]/35 px-5" onClick={() => setIsModalOpen(false)}><Card className="w-full max-w-[460px] bg-white shadow-[0_20px_60px_rgba(20,47,60,.22)]" onClick={(event) => event.stopPropagation()}><CardHeader className="p-6 pb-0"><CardTitle className="text-lg text-[#203b49]">Register a physical printer</CardTitle><CardDescription className="leading-5">PrintX will generate a unique code that you can share with customers.</CardDescription></CardHeader><CardContent className="p-6 pt-5"><form onSubmit={submit}><label className="block"><span className="text-[10px] font-bold uppercase tracking-[.15em] text-[#83949d]">Printer/shop name</span><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Northstar Studio" className="mt-2 h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3.5 text-xs outline-none focus:border-[#8eb0be]" /></label><label className="mt-3 block"><span className="text-[10px] font-bold uppercase tracking-[.15em] text-[#83949d]">Address or pickup location</span><input required value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street, city, country" className="mt-2 h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3.5 text-xs outline-none focus:border-[#8eb0be]" /></label><div className="mt-3 grid grid-cols-2 gap-3"><label className="block"><span className="text-[10px] font-bold uppercase tracking-[.15em] text-[#83949d]">Printer type</span><select value={type} onChange={(event) => setType(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3 text-xs outline-none"><option>Laser</option><option>Inkjet</option><option>Photo</option></select></label><label className="block"><span className="text-[10px] font-bold uppercase tracking-[.15em] text-[#83949d]">Currency</span><select value={currency} onChange={(event) => setCurrency(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3 text-xs outline-none">{currencyOptions.map(([code, label]) => <option key={code} value={code}>{code} — {label}</option>)}</select></label></div><label className="mt-3 block"><span className="text-[10px] font-bold uppercase tracking-[.15em] text-[#83949d]">Price per page</span><div className="relative mt-2"><input type="number" min="0" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} placeholder="0.10" className="h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3.5 pr-20 text-xs outline-none focus:border-[#8eb0be]" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#94a5ac]">per page</span></div></label><button type="button" onClick={() => setColor(!color)} className={`mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-[11px] font-semibold ${color ? "bg-[#e7f3f5] text-[#347080]" : "bg-[#f0f3f4] text-[#809099]"}`}>Color printing available<span className={`relative h-4 w-7 rounded-full ${color ? "bg-[#2c7180]" : "bg-[#cbd5d9]"}`}><span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white ${color ? "left-3.5" : "left-0.5"}`} /></span></button>{error && <p className="mt-3 rounded-lg bg-[#fff3f0] px-3 py-2.5 text-[11px] text-[#b35e51]">{error}</p>}<Button type="submit" disabled={loading} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg border-0 bg-[#1d4d63] text-xs font-semibold text-white hover:bg-[#153d50]">{loading ? "Registering…" : "Register printer"}<ArrowUpRight size={14} /></Button></form></CardContent></Card></div>}
     </main>
   );
+}
+
+function AgentConnector({ session, printers }: { session: AuthSession; printers: PrinterShop[] }) {
+  const [selectedPrinterId, setSelectedPrinterId] = useState("");
+  const [setup, setSetup] = useState<Awaited<ReturnType<typeof createOwnerAgentToken>> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+  async function connect() {
+    if (!selectedPrinterId) return;
+    setLoading(true);
+    setError("");
+    setCopied(false);
+    try {
+      setSetup(await createOwnerAgentToken(session, selectedPrinterId));
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : "Could not create an agent connection.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const envText = setup ? [`PRINTX_BACKEND_URL=${backendUrl}`, `PRINTX_AGENT_ID=${setup.agent.id}`, `PRINTX_AGENT_TOKEN=${setup.agentToken}`].join("\n") : "";
+
+  async function copySetup() {
+    if (!envText) return;
+    await navigator.clipboard.writeText(envText);
+    setCopied(true);
+  }
+
+  return <Card className="mt-6 border-[#dbe7ea] bg-[#f7fbfb] shadow-[0_7px_24px_rgba(33,57,70,.03)]"><CardContent className="p-5"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#dff0ef] text-[#327886]"><Link2 size={17} /></div><div><p className="text-sm font-semibold text-[#2b4d59]">Connect a background agent</p><p className="mt-1 max-w-[590px] text-[11px] leading-5 text-[#81959d]">Install the platform-independent PrintX agent on the computer connected to a printer. It keeps receiving jobs while this website is closed.</p></div></div><span className="w-fit rounded-full bg-[#e8f5ec] px-2.5 py-1 text-[9px] font-semibold text-[#2b8652]">Secure outbound connection</span></div>{printers.length === 0 ? <p className="mt-4 rounded-lg bg-white px-3 py-2.5 text-[11px] text-[#82969d] ring-1 ring-[#e6edef]">Register a printer first, then connect its computer agent.</p> : <div className="mt-4 flex flex-col gap-2 sm:flex-row"><select value={selectedPrinterId} onChange={(event) => setSelectedPrinterId(event.target.value)} className="h-10 flex-1 rounded-lg border border-[#dfe7eb] bg-white px-3 text-xs font-medium text-[#365663] outline-none focus:border-[#8eb0be]"><option value="">Select a registered printer</option>{printers.map((printer) => <option key={printer.id} value={printer.id}>{printer.code} · {printer.name}</option>)}</select><Button onClick={() => void connect()} disabled={!selectedPrinterId || loading} className="h-10 gap-2 rounded-lg border-0 bg-[#1d4d63] text-xs font-semibold text-white hover:bg-[#153d50]">{loading ? "Creating secure key…" : "Create agent key"}<ArrowUpRight size={14} /></Button></div>}{error && <p className="mt-3 rounded-lg bg-[#fff3f0] px-3 py-2.5 text-[11px] text-[#b35e51]">{error}</p>}{setup && <div className="mt-4 rounded-xl border border-[#cfe1e4] bg-white p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-[#315462]">Agent key created for {setup.printer.name}</p><p className="mt-1 text-[10px] leading-4 text-[#83979d]">Copy these values into <code className="rounded bg-[#f0f4f5] px-1">agent/.env</code> on the printer computer. This token is shown only here.</p></div><span className="rounded-md bg-[#fff3df] px-2 py-1 text-[9px] font-semibold text-[#a86d0e]">Copy once</span></div><pre className="mt-3 overflow-x-auto rounded-lg bg-[#173845] p-3 text-[10px] leading-5 text-[#d8eef0]">{envText}</pre><Button variant="outline" onClick={() => void copySetup()} className="mt-3 h-9 gap-2 border-[#c9dadd] text-[11px] font-semibold text-[#356776]">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Copied" : "Copy agent configuration"}</Button><p className="mt-3 text-[10px] leading-4 text-[#879ba1]">Then run <code className="rounded bg-[#f0f4f5] px-1">pnpm --dir agent start</code>. Regenerating a key disconnects the previous agent for this printer.</p></div>}</CardContent></Card>;
 }
 
 function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {

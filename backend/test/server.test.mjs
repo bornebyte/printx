@@ -8,4 +8,6 @@ test("backend exposes the expected API entrypoints", async () => {
   assert.match(source, /\/health/);
   assert.match(source, /\/api\/me\/printers/);
   assert.match(source, /\/api\/print-jobs/);
+  assert.match(source, /\/api\/agent\/jobs/);
+  assert.match(source, /agentToken/);
 });
