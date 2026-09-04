@@ -13,6 +13,9 @@ PrintX is a global printer-sharing network. People and businesses can register p
 - Display printer owner, location, availability, capabilities, pricing, rating, and turnaround
 - Upload a document and configure copies/layout in the demo print flow
 - Firebase email/password and Google sign-in
+- Separate print-user and printer-shopkeeper account flows
+- Shopkeeper printer registration with generated shareable `PX-` codes
+- Shopkeeper pricing with selectable local currency (USD, INR, EUR, GBP, AED, CAD, AUD, SGD, or JPY)
 - Optional browser notifications for print-job updates
 - Optional Gmail SMTP confirmation email using a Google app password and Node's built-in TLS API
 - Responsive shadcn-style interface for desktop and mobile browsers
@@ -31,7 +34,7 @@ Demo printer codes:
 printx/
 ├── frontend/                 # Next.js web application
 │   ├── app/page.tsx          # Public home screen and workspace component
-│   ├── app/dashboard/        # Printer-code workspace route
+│   ├── app/dashboard/        # Auth-gated user and shopkeeper workspace route
 │   ├── app/api/email/        # Server-only Gmail SMTP route
 │   ├── components/ui/        # shadcn-style UI primitives
 │   └── lib/                  # Firebase Auth and browser notification helpers
@@ -45,21 +48,23 @@ printx/
 Requirements: Node.js 20+ and pnpm 10.33.2.
 
 ```bash
-cd frontend
 pnpm install
-cp .env.example .env.local
+cp frontend/.env.example frontend/.env.local
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+This starts both services from the repository root:
+
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend: [http://localhost:4000/health](http://localhost:4000/health)
 
 Run checks before opening a pull request:
 
 ```bash
-cd frontend
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
 pnpm build
+pnpm test
 ```
 
 ## Configuration
@@ -71,10 +76,10 @@ Copy [frontend/.env.example](frontend/.env.example) to `frontend/.env.local`.
 1. Create a Firebase project and add a web app.
 2. Enable Email/Password and Google under Firebase Authentication → Sign-in method.
 3. Set `NEXT_PUBLIC_FIREBASE_API_KEY` from the Firebase web configuration.
-4. Create a Google OAuth web client and set `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
-5. Add `http://localhost:3000` and your production domain to the authorized origins.
+4. Enable Google under Firebase Authentication → Sign-in method.
+5. Add `http://localhost:3000` and your production domain under Authentication → Settings → Authorized domains.
 
-The current frontend uses Firebase Identity Toolkit REST calls and Google Identity Services. Firebase client configuration is safe to expose as `NEXT_PUBLIC_*`; user tokens should still be handled carefully in production.
+The current frontend uses Firebase Identity Toolkit REST calls for email/password and Firebase Auth's own Google popup flow. Users choose either “I need to print” or “I run a printer shop” during authentication. Use the complete web config (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from the same Firebase project. Firebase client configuration is safe to expose as `NEXT_PUBLIC_*`; user tokens should still be handled carefully in production.
 
 ### Gmail notifications
 

@@ -6,10 +6,9 @@ Thanks for helping build a more accessible printer network.
 
 Read the repository guidance in [AGENTS.md](AGENTS.md). Frontend changes should also follow [frontend/AGENTS.md](frontend/AGENTS.md).
 
-Use pnpm 10.33.2 for installs and scripts:
+Use pnpm 10.33.2 for installs and scripts from the repository root:
 
 ```bash
-cd frontend
 pnpm install
 ```
 
@@ -18,7 +17,7 @@ pnpm install
 1. Open an issue or describe the change in a draft pull request when the scope is unclear.
 2. Create a focused branch from the default branch.
 3. Keep changes small and explain user-visible behavior in the pull request.
-4. Run `pnpm lint`, `pnpm exec tsc --noEmit`, and `pnpm build` from `frontend/`.
+4. Run `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` from the repository root.
 5. Add or update documentation when behavior, environment variables, or architecture changes.
 
 ## Product-specific expectations

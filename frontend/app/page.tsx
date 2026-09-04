@@ -11,7 +11,6 @@ import {
   Globe2,
   HelpCircle,
   Layers,
-  LogIn,
   LogOut,
   MapPin,
   Menu,
@@ -28,20 +27,18 @@ import {
   Zap,
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import Script from "next/script";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { AuthLoading, AuthPanel } from "@/components/auth-panel";
+import { OwnerDashboard } from "@/components/owner-dashboard";
 import {
   clearAuthSession,
   getStoredAuthSession,
-  saveAuthSession,
-  signInWithFirebase,
-  signInWithGoogle,
-  signUpWithFirebase,
   type AuthSession,
 } from "@/lib/firebase-auth";
 import { notifyPrintJob, requestPrintNotifications } from "@/lib/browser-notifications";
+import { addSavedPrinter, createPrintJob, getSavedPrinters, removeSavedPrinter } from "@/lib/printx-api";
 
 type PrinterStatus = "Available" | "Busy";
 
@@ -54,63 +51,13 @@ type PrinterShop = {
   status: PrinterStatus;
   eta: string;
   price: string;
+  currency: string;
   rating: string;
   type: string;
   color: boolean;
   pages: string;
   initials: string;
   accent: string;
-};
-
-const printerDirectory: Record<string, PrinterShop> = {
-  "PX-4812": {
-    id: "northstar-studio",
-    code: "PX-4812",
-    name: "Northstar Studio",
-    owner: "Design & Co.",
-    address: "23 William St, Brooklyn, NY",
-    status: "Available",
-    eta: "Ready in 5 min",
-    price: "$0.12 / page",
-    rating: "4.9",
-    type: "Laser",
-    color: true,
-    pages: "Up to 250 pages",
-    initials: "DS",
-    accent: "lavender",
-  },
-  "PX-7390": {
-    id: "paper-lane",
-    code: "PX-7390",
-    name: "Paper Lane",
-    owner: "Maya Chen",
-    address: "91 Wythe Ave, Brooklyn, NY",
-    status: "Available",
-    eta: "Ready in 12 min",
-    price: "$0.08 / page",
-    rating: "4.8",
-    type: "Inkjet",
-    color: true,
-    pages: "Up to 80 pages",
-    initials: "MC",
-    accent: "peach",
-  },
-  "PX-1055": {
-    id: "brooklyn-library",
-    code: "PX-1055",
-    name: "Brooklyn Library",
-    owner: "Public Access",
-    address: "10 Grand Army Plaza, Brooklyn, NY",
-    status: "Busy",
-    eta: "Available in 20 min",
-    price: "$0.10 / page",
-    rating: "4.7",
-    type: "Laser",
-    color: false,
-    pages: "Up to 500 pages",
-    initials: "BL",
-    accent: "blue",
-  },
 };
 
 const statusStyles: Record<PrinterStatus, string> = {
@@ -133,20 +80,28 @@ export function WorkspaceDashboard() {
   const [jobSubmitted, setJobSubmitted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authError, setAuthError] = useState("");
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const [googleReady, setGoogleReady] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [apiError, setApiError] = useState("");
+  const [isAddLoading, setIsAddLoading] = useState(false);
 
   useEffect(() => {
     const storedSession = getStoredAuthSession();
-    if (!storedSession) return;
-    const restoreTimer = window.setTimeout(() => setAuthSession(storedSession), 0);
+    const restoreTimer = window.setTimeout(() => {
+      setAuthSession(storedSession);
+      setAuthReady(true);
+    }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, []);
+
+  useEffect(() => {
+    if (!authSession || authSession.role !== "user") return;
+    void getSavedPrinters(authSession)
+      .then((printers) => {
+        setLinkedPrinters(printers);
+        setSelectedPrinterId((current) => current || printers[0]?.id || "");
+      })
+      .catch((error) => setApiError(error instanceof Error ? error.message : "Could not load your printers."));
+  }, [authSession]);
 
   const selectedPrinter = linkedPrinters.find((printer) => printer.id === selectedPrinterId);
   const visiblePrinters = useMemo(() => {
@@ -165,87 +120,77 @@ export function WorkspaceDashboard() {
     }
   }
 
-  function addPrinter() {
+  async function addPrinter() {
     const normalizedCode = code.trim().toUpperCase();
-    const printer = printerDirectory[normalizedCode];
-    if (!printer) {
-      setCodeError("We couldn’t find that code. Try PX-4812, PX-7390, or PX-1055.");
-      return;
-    }
     if (linkedPrinters.some((item) => item.code === normalizedCode)) {
       setCodeError("This printer shop is already in your list.");
       return;
     }
-    setLinkedPrinters((current) => [...current, printer]);
-    setSelectedPrinterId(printer.id);
-    setCode("");
-    setCodeError("");
-    setIsAddModalOpen(false);
+    if (!authSession) return;
+    setIsAddLoading(true);
+    try {
+      const savedPrinter = await addSavedPrinter(authSession, normalizedCode);
+      setLinkedPrinters((current) => [...current, savedPrinter]);
+      setSelectedPrinterId(savedPrinter.id);
+      setCode("");
+      setCodeError("");
+      setIsAddModalOpen(false);
+    } catch (error) {
+      setCodeError(error instanceof Error ? error.message : "Could not find or add this printer.");
+    } finally {
+      setIsAddLoading(false);
+    }
   }
 
-  function removePrinter(id: string) {
-    setLinkedPrinters((current) => current.filter((printer) => printer.id !== id));
-    if (selectedPrinterId === id) setSelectedPrinterId("");
+  async function removePrinter(id: string) {
+    if (!authSession) return;
+    try {
+      await removeSavedPrinter(authSession, id);
+      setLinkedPrinters((current) => current.filter((printer) => printer.id !== id));
+      if (selectedPrinterId === id) setSelectedPrinterId("");
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Could not remove this printer.");
+    }
   }
 
-  function submitJob() {
-    if (!selectedPrinter || !fileName) return;
+  async function submitJob() {
+    if (!authSession || !selectedPrinter || !fileName) return;
     void requestPrintNotifications();
     setIsSubmitting(true);
-    window.setTimeout(async () => {
+    setApiError("");
+    try {
+      const job = await createPrintJob(authSession, {
+        printerId: selectedPrinter.id,
+        fileName,
+        copies,
+        doubleSided,
+      });
       setIsSubmitting(false);
       setJobSubmitted(true);
       notifyPrintJob(selectedPrinter.name, selectedPrinter.code);
-      if (authSession?.email) {
+      if (authSession.email) {
         await fetch("/api/email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: authSession.email,
-            subject: `PrintX job sent to ${selectedPrinter.name}`,
+            subject: `PrintX job ${job.id.slice(0, 8)} sent to ${selectedPrinter.name}`,
             text: `${fileName} is queued at ${selectedPrinter.name} (${selectedPrinter.code}).`,
           }),
         }).catch(() => undefined);
       }
-    }, 900);
-  }
-
-  async function handleAuthSubmit() {
-    setIsAuthLoading(true);
-    setAuthError("");
-    try {
-      const session = authMode === "signin"
-        ? await signInWithFirebase(authEmail, authPassword)
-        : await signUpWithFirebase(authEmail, authPassword);
-      saveAuthSession(session);
-      setAuthSession(session);
-      setAuthPassword("");
-      setIsAuthModalOpen(false);
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Authentication failed. Please try again.");
-    } finally {
-      setIsAuthLoading(false);
+      setIsSubmitting(false);
+      setApiError(error instanceof Error ? error.message : "Could not send this print job.");
     }
   }
 
-  async function handleGoogleAuth() {
-    setIsAuthLoading(true);
-    setAuthError("");
-    try {
-      const session = await signInWithGoogle();
-      saveAuthSession(session);
-      setAuthSession(session);
-      setIsAuthModalOpen(false);
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
-    } finally {
-      setIsAuthLoading(false);
-    }
-  }
+  if (!authReady) return <AuthLoading />;
+  if (!authSession) return <AuthPanel onAuthenticated={(session) => { setLinkedPrinters([]); setSelectedPrinterId(""); setAuthSession(session); }} />;
+  if (authSession.role === "owner") return <OwnerDashboard session={authSession} onSignOut={() => { setLinkedPrinters([]); setSelectedPrinterId(""); setAuthSession(null); }} />;
 
   return (
     <main className="min-h-screen bg-[#f8fafb] text-[#16232e]">
-      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onLoad={() => setGoogleReady(true)} />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[252px] flex-col border-r border-[#e5eaee] bg-[#fbfcfd] lg:flex">
         <Brand />
         <div className="px-4 pt-8">
@@ -288,8 +233,8 @@ export function WorkspaceDashboard() {
           <div className="flex items-center gap-2 sm:gap-4">
             <button className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-[#667782] hover:bg-[#edf2f4] sm:flex"><Globe2 size={15} /> Global network <ChevronDown size={13} /></button>
             <button className="relative rounded-lg p-2 text-[#6e808b] hover:bg-[#edf2f4]" aria-label="Notifications"><Bell size={18} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#e2815f] ring-2 ring-[#fbfcfd]" /></button>
-            {authSession ? <button onClick={() => { clearAuthSession(); setAuthSession(null); }} className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-[#667782] hover:bg-[#edf2f4] sm:flex"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#cfe5ea] text-[10px] font-bold text-[#28576a]">{authSession.email.slice(0, 2).toUpperCase()}</span><span className="max-w-[120px] truncate">{authSession.email}</span><LogOut size={14} /></button> : <Button onClick={() => { setAuthMode("signin"); setAuthError(""); setIsAuthModalOpen(true); }} variant="outline" size="sm" className="hidden border-[#c6d9df] bg-white text-[#315b6b] sm:inline-flex"><LogIn size={14} /> Sign in</Button>}
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#cfe5ea] text-[11px] font-bold text-[#28576a] sm:hidden">{authSession ? authSession.email.slice(0, 2).toUpperCase() : "AR"}</div>
+            <button onClick={() => { clearAuthSession(); setAuthSession(null); setLinkedPrinters([]); setSelectedPrinterId(""); }} className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-[#667782] hover:bg-[#edf2f4] sm:flex"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#cfe5ea] text-[10px] font-bold text-[#28576a]">{authSession.email.slice(0, 2).toUpperCase()}</span><span className="max-w-[120px] truncate">{authSession.email}</span><LogOut size={14} /></button>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#cfe5ea] text-[11px] font-bold text-[#28576a] sm:hidden">{authSession.email.slice(0, 2).toUpperCase()}</div>
           </div>
         </header>
 
@@ -309,6 +254,7 @@ export function WorkspaceDashboard() {
               {linkedPrinters.length > 0 && <label className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aa9b1]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your printers" className="h-9 w-full rounded-lg border border-[#e3eaed] pl-9 pr-3 text-xs outline-none placeholder:text-[#a5b0b6] focus:border-[#9bbbc4] sm:w-[210px]" /></label>}
             </div>
 
+            {apiError && <div className="mx-5 mt-4 rounded-lg bg-[#fff3f0] px-3 py-2.5 text-[11px] text-[#b35e51] sm:mx-6">{apiError}</div>}
             {linkedPrinters.length === 0 ? <EmptyPrinterState onAdd={() => setIsAddModalOpen(true)} /> : <div className="divide-y divide-[#edf1f3]">{visiblePrinters.map((printer) => <SavedPrinterRow key={printer.id} printer={printer} selected={printer.id === selectedPrinterId} onSelect={() => { setSelectedPrinterId(printer.id); setJobSubmitted(false); }} onRemove={() => removePrinter(printer.id)} />)}{visiblePrinters.length === 0 && <div className="px-6 py-10 text-center text-xs text-[#8999a2]">No saved printer matches “{search}”.</div>}</div>}
           </div>
 
@@ -324,8 +270,7 @@ export function WorkspaceDashboard() {
 
       {mobileMenuOpen && <div className="fixed inset-0 z-40 bg-[#18313d]/25 lg:hidden" onClick={() => setMobileMenuOpen(false)}><aside className="h-full w-[260px] bg-[#fbfcfd] p-4 shadow-xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><Brand /><button className="rounded-lg p-2 text-[#60727e] hover:bg-[#edf2f4]" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu"><X size={18} /></button></div><div className="mt-8 space-y-1">{["Overview", "My printers", "My print jobs"].map((label) => <button key={label} onClick={() => { setActiveNav(label); setMobileMenuOpen(false); }} className={`block w-full rounded-xl px-3 py-3 text-left text-sm font-medium ${activeNav === label ? "bg-[#e9f0f5] text-[#18394d]" : "text-[#71808c]"}`}>{label}</button>)}</div></aside></div>}
 
-      {isAddModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18313d]/35 px-5" onClick={() => setIsAddModalOpen(false)}><div className="w-full max-w-[440px] rounded-2xl bg-white p-6 shadow-[0_20px_60px_rgba(20,47,60,0.22)]" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f2f4] text-[#2b6b7d]"><Printer size={19} /></div><h2 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-[#203b49]">Add a printer shop</h2><p className="mt-1.5 text-xs leading-5 text-[#84949c]">Enter the unique code shown by the printer owner or shop.</p></div><button className="rounded-lg p-2 text-[#8da0a9] hover:bg-[#f1f5f6]" onClick={() => setIsAddModalOpen(false)} aria-label="Close dialog"><X size={18} /></button></div><label className="mt-6 block"><span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#83949d]">Printer code</span><div className="relative mt-2"><input autoFocus value={code} onChange={(event) => { setCode(event.target.value); setCodeError(""); }} onKeyDown={(event) => { if (event.key === "Enter") addPrinter(); }} placeholder="e.g. PX-4812" className={`h-12 w-full rounded-lg border bg-[#fbfcfc] px-3.5 pr-20 text-sm font-semibold tracking-[0.08em] text-[#315667] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#a8b3b8] ${codeError ? "border-[#d58a7d]" : "border-[#dfe7eb] focus:border-[#8eb0be]"}`} /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[#a0adb3]">4–8 chars</span></div></label>{codeError ? <p className="mt-2 text-[11px] text-[#b35e51]">{codeError}</p> : <p className="mt-2 text-[11px] text-[#99a7ad]">Ask the printer owner for their code. It starts with PX-.</p>}<Button onClick={addPrinter} className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg border-0 bg-[#1d4d63] text-xs font-semibold text-white transition hover:bg-[#153d50]">Find and add printer <ArrowUpRight size={15} /></Button><div className="mt-4 flex items-center gap-2 rounded-lg bg-[#f5f8f9] px-3 py-2.5 text-[10px] leading-4 text-[#81949d]"><Search size={14} className="shrink-0 text-[#6d96a1]" /> Demo codes: <span className="font-semibold text-[#557582]">PX-4812</span>, <span className="font-semibold text-[#557582]">PX-7390</span>, <span className="font-semibold text-[#557582]">PX-1055</span></div></div></div>}
-      {isAuthModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18313d]/35 px-5" onClick={() => setIsAuthModalOpen(false)}><div className="w-full max-w-[420px] rounded-2xl bg-white p-6 shadow-[0_20px_60px_rgba(20,47,60,0.22)]" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f2f4] text-[#2b6b7d]"><ShieldCheck size={19} /></div><h2 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-[#203b49]">{authMode === "signin" ? "Sign in to PrintX" : "Create your PrintX account"}</h2><p className="mt-1.5 text-xs leading-5 text-[#84949c]">Use Firebase Authentication to keep your printer list synced to your account.</p></div><button className="rounded-lg p-2 text-[#8da0a9] hover:bg-[#f1f5f6]" onClick={() => setIsAuthModalOpen(false)} aria-label="Close dialog"><X size={18} /></button></div><Button onClick={() => void handleGoogleAuth()} disabled={isAuthLoading || !googleReady} variant="outline" className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg border-[#d8e2e5] bg-white text-xs font-semibold text-[#3c515c] hover:bg-[#f6f9fa]">{isAuthLoading ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#b6c7cd] border-t-[#315b6b]" /> : <span className="text-base font-bold text-[#4285f4]">G</span>}{googleReady ? "Continue with Google" : "Loading Google sign-in…"}</Button><div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-[#e8edef]" /><span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#a0acb2]">or with email</span><span className="h-px flex-1 bg-[#e8edef]" /></div><label className="block"><span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#83949d]">Email</span><input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" className="mt-2 h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3.5 text-xs text-[#315667] outline-none focus:border-[#8eb0be]" /></label><label className="mt-3 block"><span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#83949d]">Password</span><input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void handleAuthSubmit(); }} placeholder="At least 6 characters" className="mt-2 h-11 w-full rounded-lg border border-[#dfe7eb] bg-[#fbfcfc] px-3.5 text-xs text-[#315667] outline-none focus:border-[#8eb0be]" /></label>{authError && <p className="mt-3 rounded-lg bg-[#fff3f0] px-3 py-2.5 text-[11px] leading-4 text-[#b35e51]">{authError}</p>}<Button onClick={() => void handleAuthSubmit()} disabled={isAuthLoading || !authEmail || !authPassword} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg border-0 bg-[#1d4d63] text-xs font-semibold text-white transition hover:bg-[#153d50]">{isAuthLoading ? "Connecting…" : authMode === "signin" ? "Sign in" : "Create account"}</Button><button onClick={() => { setAuthMode(authMode === "signin" ? "signup" : "signin"); setAuthError(""); }} className="mt-4 w-full text-center text-[11px] font-semibold text-[#3c7180] hover:underline">{authMode === "signin" ? "New to PrintX? Create an account" : "Already have an account? Sign in"}</button></div></div>}
+      {isAddModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18313d]/35 px-5" onClick={() => setIsAddModalOpen(false)}><div className="w-full max-w-[440px] rounded-2xl bg-white p-6 shadow-[0_20px_60px_rgba(20,47,60,0.22)]" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f2f4] text-[#2b6b7d]"><Printer size={19} /></div><h2 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-[#203b49]">Add a printer shop</h2><p className="mt-1.5 text-xs leading-5 text-[#84949c]">Enter the unique code shown by the printer owner or shop.</p></div><button className="rounded-lg p-2 text-[#8da0a9] hover:bg-[#f1f5f6]" onClick={() => setIsAddModalOpen(false)} aria-label="Close dialog"><X size={18} /></button></div><label className="mt-6 block"><span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#83949d]">Printer code</span><div className="relative mt-2"><input autoFocus value={code} onChange={(event) => { setCode(event.target.value); setCodeError(""); }} onKeyDown={(event) => { if (event.key === "Enter") void addPrinter(); }} placeholder="e.g. PX-4812" className={`h-12 w-full rounded-lg border bg-[#fbfcfc] px-3.5 pr-20 text-sm font-semibold tracking-[0.08em] text-[#315667] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#a8b3b8] ${codeError ? "border-[#d58a7d]" : "border-[#dfe7eb] focus:border-[#8eb0be]"}`} /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[#a0adb3]">4–8 chars</span></div></label>{codeError ? <p className="mt-2 text-[11px] text-[#b35e51]">{codeError}</p> : <p className="mt-2 text-[11px] text-[#99a7ad]">Ask the printer owner for their code. It starts with PX-.</p>}<Button onClick={() => void addPrinter()} disabled={isAddLoading} className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg border-0 bg-[#1d4d63] text-xs font-semibold text-white transition hover:bg-[#153d50]">{isAddLoading ? "Adding printer…" : "Find and add printer"} {!isAddLoading && <ArrowUpRight size={15} />}</Button><div className="mt-4 flex items-center gap-2 rounded-lg bg-[#f5f8f9] px-3 py-2.5 text-[10px] leading-4 text-[#81949d]"><Search size={14} className="shrink-0 text-[#6d96a1]" /> Demo codes: <span className="font-semibold text-[#557582]">PX-4812</span>, <span className="font-semibold text-[#557582]">PX-7390</span>, <span className="font-semibold text-[#557582]">PX-1055</span></div></div></div>}
     </main>
   );
 }

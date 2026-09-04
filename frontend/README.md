@@ -32,16 +32,20 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 This is the initial PrintX web application: users start with an empty saved-printer list, add printer shops by their unique `PX-` code, review shop details, upload a document, and send a print job to a selected saved printer.
 
-The public home screen is available at `/`; the working printer-code dashboard is available at `/dashboard`.
+The public home screen is available at `/`; `/dashboard` is auth-gated and routes regular print users to saved-printer printing and printer shopkeepers to printer registration.
+
+Printer shopkeepers choose a supported currency and price per page when registering a printer. That currency is stored with the generated printer code and shown to users in the saved-printer and print-job flow.
 
 ## Local setup
 
-Copy `.env.example` to `.env.local`. Set `NEXT_PUBLIC_FIREBASE_API_KEY` from the Firebase web app configuration, set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` from a Google OAuth web client, and enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them.
+Copy `.env.example` to `.env.local`. Set the Firebase web config values (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from one Firebase project, then enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them.
 
 The Gmail credentials are consumed only by `app/api/email/route.ts`, which uses Node's built-in TLS client to talk to Gmail SMTP. They must never use `NEXT_PUBLIC_*` variables.
 
 ```bash
+cd ..
 pnpm install
+cp frontend/.env.example frontend/.env.local
 pnpm dev
 ```
 

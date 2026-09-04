@@ -20,3 +20,4 @@ coverage/
 firebase-service-account*.json
 service-account*.json
 *.pem
+backend/data/
