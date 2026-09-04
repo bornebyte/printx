@@ -6,7 +6,7 @@ import { ArrowUpRight, Bell, Check, Copy, Link2, LogOut, MapPin, Plus, Printer, 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { clearAuthSession, type AuthSession } from "@/lib/firebase-auth";
-import { createOwnerAgentToken, getOwnerPrinters, registerOwnerPrinter, type PrinterShop } from "@/lib/printx-api";
+import { createOwnerAgentToken, getOwnerPrinters, registerOwnerPrinter, saveProfile, type PrinterShop } from "@/lib/printx-api";
 
 const currencyOptions = [
   ["USD", "US Dollar"],
@@ -39,10 +39,24 @@ export function OwnerDashboard({ session, onSignOut }: OwnerDashboardProps) {
   const [loadingList, setLoadingList] = useState(true);
 
   useEffect(() => {
-    void getOwnerPrinters(session)
-      .then(setPrinters)
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Could not load your printers."))
-      .finally(() => setLoadingList(false));
+    let active = true;
+
+    async function loadOwnerWorkspace() {
+      try {
+        // Older sessions could have been created before profile persistence was required.
+        // Establish the selected owner role before making role-protected requests.
+        await saveProfile(session);
+        const ownerPrinters = await getOwnerPrinters(session);
+        if (active) setPrinters(ownerPrinters);
+      } catch (loadError) {
+        if (active) setError(loadError instanceof Error ? loadError.message : "Could not load your printers.");
+      } finally {
+        if (active) setLoadingList(false);
+      }
+    }
+
+    void loadOwnerWorkspace();
+    return () => { active = false; };
   }, [session]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {

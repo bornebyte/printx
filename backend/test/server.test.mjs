@@ -13,6 +13,7 @@ test("backend exposes the expected API entrypoints", async () => {
   assert.match(source, /createFirestoreStore/);
   assert.match(source, /PRINTX_STORAGE/);
   assert.match(source, /ensureBackendReady/);
+  assert.match(source, /already registered as a/);
   assert.doesNotMatch(source, /const firestoreStore = storageMode/);
 });
 

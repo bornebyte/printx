@@ -34,8 +34,8 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
     setError("");
     try {
       const session = mode === "signin" ? await signInWithFirebase(email, password, role) : await signUpWithFirebase(email, password, role);
+      await saveProfile(session);
       saveAuthSession(session);
-      await saveProfile(session).catch(() => undefined);
       onAuthenticated(session);
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Authentication failed. Please try again.");
@@ -49,8 +49,8 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
     setError("");
     try {
       const session = await signInWithGoogle(role);
+      await saveProfile(session);
       saveAuthSession(session);
-      await saveProfile(session).catch(() => undefined);
       onAuthenticated(session);
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Google sign-in failed. Please try again.");

@@ -378,6 +378,12 @@ export async function handleRequest(request, response) {
       const body = await readBody(request);
       const role = body.role === "owner" ? "owner" : body.role === "user" ? "user" : "";
       if (!role) { json(response, 422, { error: "A valid account role is required." }); return; }
+      const existingProfile = store.profiles[user.uid];
+      if (existingProfile?.role && existingProfile.role !== role) {
+        const existingAccountType = existingProfile.role === "owner" ? "printer shopkeeper" : "print user";
+        json(response, 409, { error: `This account is already registered as a ${existingAccountType}. Choose the matching account type to continue.` });
+        return;
+      }
       store.profiles[user.uid] = { email: user.email, role, updatedAt: new Date().toISOString() };
       await persistStore();
       json(response, 200, { profile: store.profiles[user.uid] });
