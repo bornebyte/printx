@@ -2,7 +2,7 @@
 
 The backend workspace is reserved for PrintX server-side services, Firebase integration, printer agents, job orchestration, and secure notifications.
 
-Use pnpm for backend installs and scripts (`pnpm@10.33.2`). From the repository root, `pnpm dev`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` cover both workspaces. Keep the backend lockfile authoritative.
+Use pnpm for backend installs and scripts (`pnpm@10.33.2`). The production web deployment imports this service through `frontend/app/api/[[...path]]/route.ts`; the standalone listener remains available through `pnpm backend:dev`. From the repository root, `pnpm dev`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` cover all workspaces. Keep the backend lockfile authoritative.
 
 ## Security
 

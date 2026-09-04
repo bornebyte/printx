@@ -4,8 +4,11 @@
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "dev": "pnpm --parallel --filter ./frontend --filter ./backend dev",
-    "dev:all": "pnpm --parallel --filter ./frontend --filter ./backend --filter ./agent dev",
+    "dev": "pnpm --filter ./frontend dev",
+    "dev:all": "pnpm --parallel --filter ./frontend --filter ./agent dev",
+    "backend:dev": "pnpm --filter ./backend dev",
+    "backend:start": "pnpm --filter ./backend start",
+    "start": "pnpm --filter ./frontend start",
     "agent": "pnpm --dir agent start",
     "agent:dev": "pnpm --dir agent dev",
     "lint": "pnpm --filter ./frontend lint && pnpm --filter ./backend lint && pnpm --filter ./agent lint",

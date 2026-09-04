@@ -9,7 +9,8 @@ PrintX is a global printer-sharing and remote-printing platform. The repository 
 - `frontend/components/ui/` — shadcn-style UI primitives. Reuse these primitives for new surfaces and keep the existing base-nova visual language.
 - `frontend/lib/` — browser-safe helpers, including Firebase Authentication REST integration and browser notification helpers.
 - `frontend/app/api/email/route.ts` — server-only Gmail SMTP notification endpoint using Node's built-in TLS API.
-- `backend/` — server-side Firebase-authenticated printer, job, and agent APIs with Firestore persistence.
+- `frontend/app/api/[[...path]]/route.ts` — unified Next.js Route Handler adapter for the backend API.
+- `backend/` — importable Firebase-authenticated printer, job, and agent service with a standalone runtime and Firestore persistence.
 - `agent/` — dependency-free, platform-independent Node.js background worker, local offline dashboard, printer adapter, and OS auto-start installers.
 
 ## Product behavior currently implemented
@@ -53,8 +54,9 @@ Use pnpm as the preferred package manager. From `/home/shubham/dev/printx`, use:
 ```bash
 pnpm install
 cp backend/.env.example backend/.env
-pnpm dev       # frontend + backend together
-pnpm dev:all   # frontend + backend + unpaired agent for local development
+pnpm dev       # unified frontend + backend API on port 3000
+pnpm dev:all   # unified app + unpaired agent for local development
+pnpm backend:dev # optional standalone backend runtime
 pnpm agent:dev # agent only
 pnpm lint      # both packages
 pnpm typecheck # both packages

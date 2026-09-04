@@ -3,3 +3,5 @@ Read `AGENTS.md` before changing this app. It contains generated Next.js guidanc
 Project-specific behavior is documented in the repository-level `../AGENTS.md`. The current product flow is deliberately code-first: users start with an empty printer list, add shops by unique `PX-` code, and select from saved printers during upload/send.
 
 Use the existing shadcn-style components under `components/ui/`. Keep Gmail credentials server-only and keep browser notification permission optional.
+
+The frontend is the unified production deployment entrypoint. Its catch-all `/api/[[...path]]` route serves the importable backend service from the same origin. Keep `NEXT_PUBLIC_API_URL` blank for production; the standalone backend URL is only for intentional local/self-hosted fallback use.

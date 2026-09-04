@@ -2,7 +2,7 @@
 
 PrintX is a global printer-sharing network. People and businesses can register physical printers, share them with a unique printer code, and let others securely send print jobs from anywhere.
 
-> PrintX is currently an early web MVP. The user flow, backend queue, secure initial document handoff, and first cross-platform printer-agent foundation are functional, while production encrypted storage, payments, and printer drivers are still being built.
+> PrintX is currently an early web MVP. The user flow, unified Next.js API, Firestore persistence, secure initial document handoff, and first cross-platform printer-agent foundation are functional, while production encrypted storage, payments, and printer drivers are still being built.
 
 ## Current MVP
 
@@ -40,7 +40,7 @@ printx/
 │   ├── app/api/email/        # Server-only Gmail SMTP route
 │   ├── components/ui/        # shadcn-style UI primitives
 │   └── lib/                  # Firebase Auth and browser notification helpers
-├── backend/                  # Authenticated printer, job, agent APIs, and Firestore persistence
+├── backend/                  # Importable API service, standalone runtime, and Firestore persistence
 ├── agent/                    # Platform-independent background worker and local UI
 ├── .github/                  # CI, issue templates, and pull request template
 └── AGENTS.md                 # Project instructions for coding agents
@@ -57,10 +57,12 @@ cp backend/.env.example backend/.env
 pnpm dev
 ```
 
-This starts both services from the repository root:
+This starts one Next.js service from the repository root. It serves both the website and backend API from the same origin:
 
 - Frontend: [http://localhost:3000](http://localhost:3000)
-- Backend: [http://localhost:4000/health](http://localhost:4000/health)
+- Backend API: [http://localhost:3000/api/health](http://localhost:3000/api/health)
+
+The old standalone backend listener remains available for long-running self-hosted setups with `pnpm backend:dev`, but it is not required for the unified deployment.
 
 To run the agent during development as well:
 
@@ -102,6 +104,14 @@ Copy [frontend/.env.example](frontend/.env.example) to `frontend/.env.local`.
 5. Add `http://localhost:3000` and your production domain under Authentication → Settings → Authorized domains.
 
 The current frontend uses Firebase Identity Toolkit REST calls for email/password and Firebase Auth's own Google popup flow. Users choose either “I need to print” or “I run a printer shop” during authentication. Use the complete web config (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from the same Firebase project. Firebase client configuration is safe to expose as `NEXT_PUBLIC_*`; user tokens should still be handled carefully in production.
+
+### Unified deployment
+
+PrintX is configured as one Next.js deployment. The catch-all route at `frontend/app/api/[[...path]]/route.ts` adapts the existing backend service to Next.js Route Handlers, so the website, authenticated API, Gmail route, and agent API are served by one deployment URL. Keep `NEXT_PUBLIC_API_URL` empty for this mode. The owner-generated agent configuration should use the same public URL, for example `PRINTX_BACKEND_URL=https://printx.example.com`.
+
+For Vercel, import the repository as one project from its root. The included `vercel.json` uses pnpm and builds the `frontend` workspace. Add the Firebase web variables, Firestore service-account variable, and Gmail variables in that one Vercel project. `FIREBASE_SERVICE_ACCOUNT_BASE64` is the most convenient server-only option for Vercel; never use a `NEXT_PUBLIC_` prefix for it.
+
+Because the agent is a persistent computer process and must print while the browser is closed, it remains a separate installation on each printer computer. It connects outbound to the same deployed URL; it does not require a second web deployment.
 
 ### Firebase Firestore
 

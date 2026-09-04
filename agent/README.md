@@ -17,13 +17,13 @@ The agent does not open a public inbound port. The backend sends no unsolicited 
 
 ## Pair a printer
 
-1. Start the frontend and backend from the repository root with `pnpm dev`.
+1. Start the unified PrintX web service from the repository root with `pnpm dev`.
 2. Sign in as a printer shopkeeper and register a printer.
 3. Select that printer in “Connect a background agent” and create an agent key.
 4. Copy the displayed values into `agent/.env`:
 
 ```dotenv
-PRINTX_BACKEND_URL=https://api.example.com
+PRINTX_BACKEND_URL=https://printx.example.com
 PRINTX_AGENT_ID=the-issued-agent-id
 PRINTX_AGENT_TOKEN=the-issued-token
 PRINTX_AGENT_PRINTER_MODE=mock

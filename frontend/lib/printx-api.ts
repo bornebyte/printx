@@ -40,7 +40,7 @@ export type OwnerPrinterInput = {
   currency: string;
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "") ?? "";
 
 async function apiRequest<T>(path: string, session: AuthSession, init: RequestInit = {}) {
   const response = await fetch(`${apiUrl}${path}`, {

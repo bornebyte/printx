@@ -2,7 +2,11 @@ import { createServer } from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createFirestoreStore } from "./firestore.mjs";
+
+const backendFile = fileURLToPath(import.meta.url);
+const backendDirectory = dirname(backendFile);
 
 async function loadLocalEnv(file) {
   try {
@@ -21,13 +25,13 @@ async function loadLocalEnv(file) {
   }
 }
 
-await loadLocalEnv(resolve("../frontend/.env.local"));
-await loadLocalEnv(resolve(".env"));
+await loadLocalEnv(resolve(backendDirectory, "../frontend/.env.local"));
+await loadLocalEnv(resolve(backendDirectory, ".env"));
 
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? "0.0.0.0";
 const firebaseApiKey = process.env.FIREBASE_API_KEY ?? process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const dataFile = resolve(process.env.PRINTX_DATA_FILE ?? "./data/store.json");
+const dataFile = process.env.PRINTX_DATA_FILE ? resolve(process.env.PRINTX_DATA_FILE) : resolve(backendDirectory, "data/store.json");
 const documentsDir = resolve(dirname(dataFile), "documents");
 const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
 const storageMode = String(process.env.PRINTX_STORAGE ?? "firestore").trim().toLowerCase();
@@ -356,7 +360,7 @@ async function handleAgentRequest(request, response, url) {
   return true;
 }
 
-async function handleRequest(request, response) {
+export async function handleRequest(request, response) {
   if (request.method === "OPTIONS") {
     response.writeHead(204, { "Access-Control-Allow-Origin": allowedOrigin, "Access-Control-Allow-Credentials": "true", "Access-Control-Allow-Headers": "Authorization, Content-Type, X-PrintX-User-Id", "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS", Vary: "Origin" });
     response.end();
@@ -507,12 +511,18 @@ async function handleRequest(request, response) {
   json(response, 404, { error: "Route not found." });
 }
 
-await loadStore();
-console.log(`PrintX persistence: ${storageMode}`);
-createServer((request, response) => {
-  handleRequest(request, response).catch((error) => {
-    console.error("Unhandled backend error", error);
-    if (!response.headersSent) json(response, 500, { error: "Internal server error." });
-    else response.destroy();
-  });
-}).listen(port, host, () => console.log(`PrintX backend listening on http://${host}:${port}`));
+export const backendReady = loadStore().then(() => {
+  console.log(`PrintX persistence: ${storageMode}`);
+});
+
+const isDirectRun = process.argv[1] && resolve(process.argv[1]) === backendFile;
+if (isDirectRun) {
+  await backendReady;
+  createServer((request, response) => {
+    handleRequest(request, response).catch((error) => {
+      console.error("Unhandled backend error", error);
+      if (!response.headersSent) json(response, 500, { error: "Internal server error." });
+      else response.destroy();
+    });
+  }).listen(port, host, () => console.log(`PrintX backend listening on http://${host}:${port}`));
+}

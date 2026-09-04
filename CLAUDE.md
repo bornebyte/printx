@@ -6,6 +6,6 @@ Keep the initial product flow code-based: users add printer shops by unique prin
 
 Prefer pnpm (`pnpm@10.33.2`) for package installation and scripts.
 
-The backend uses Firebase Firestore by default for structured application data. Keep service-account credentials server-only, configure `backend/.env` from `backend/.env.example`, and use `PRINTX_STORAGE=local` only when an intentional local-only fallback is needed. The current state-document adapter is an MVP; do not treat it as the final billion-user schema.
+The backend uses Firebase Firestore by default for structured application data. The production web deployment is one Next.js project: `frontend/app/api/[[...path]]/route.ts` adapts the importable backend service to the same origin. Keep service-account credentials server-only, configure `backend/.env` from `backend/.env.example`, and use `PRINTX_STORAGE=local` only when an intentional local-only fallback is needed. The current state-document adapter is an MVP; do not treat it as the final billion-user schema.
 
 Keep the printer agent core platform-independent and dependency-free. Use secure outbound HTTPS polling with one-time hashed tokens; keep the local dashboard loopback-only and never expose agent tokens in its API.

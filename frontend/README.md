@@ -30,7 +30,7 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # PrintX frontend
 
-This is the initial PrintX web application: users start with an empty saved-printer list, add printer shops by their unique `PX-` code, review shop details, upload a document up to 25 MB, and send a print job to a selected saved printer.
+This is the initial PrintX web application and unified deployment entrypoint: users start with an empty saved-printer list, add printer shops by their unique `PX-` code, review shop details, upload a document up to 25 MB, and send a print job to a selected saved printer. The `/api/[[...path]]` route serves the existing backend from the same Next.js deployment.
 
 The public home screen is available at `/`; `/dashboard` is auth-gated and routes regular print users to saved-printer printing and printer shopkeepers to printer registration.
 
@@ -38,7 +38,7 @@ Printer shopkeepers choose a supported currency and price per page when register
 
 ## Local setup
 
-Copy `.env.example` to `.env.local`. Set the Firebase web config values (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from one Firebase project, then enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them.
+Copy `.env.example` to `.env.local`. Set the Firebase web config values (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`) from one Firebase project, then enable Email/Password and Google under Firebase Authentication. Gmail notifications are optional; add `GMAIL_USER` and a Google app password to enable them. Leave `NEXT_PUBLIC_API_URL` empty when using the unified deployment.
 
 The Gmail credentials are consumed only by `app/api/email/route.ts`, which uses Node's built-in TLS client to talk to Gmail SMTP. They must never use `NEXT_PUBLIC_*` variables.
 
@@ -48,6 +48,7 @@ Use the Gmail account address in `GMAIL_USER` and a Google app password (remove 
 cd ..
 pnpm install
 cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env
 pnpm dev
 ```
 
@@ -57,7 +58,7 @@ Demo printer codes:
 - `PX-7390` — Paper Lane
 - `PX-1055` — Brooklyn Library
 
-The printer directory, file upload, and job submission are currently demo state. Replace them with authenticated APIs and Firebase Storage/Firestore for the production workflow.
+The printer directory, file upload, and job submission are served through the same deployment. Configure backend Firestore credentials from `backend/.env.example` before using authenticated API routes.
 
 ## Verification
 
