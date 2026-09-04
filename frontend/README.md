@@ -42,6 +42,8 @@ Copy `.env.example` to `.env.local`. Set the Firebase web config values (`NEXT_P
 
 The Gmail credentials are consumed only by `app/api/email/route.ts`, which uses Node's built-in TLS client to talk to Gmail SMTP. They must never use `NEXT_PUBLIC_*` variables.
 
+Use the Gmail account address in `GMAIL_USER` and a Google app password (remove spaces if copied from the Google UI; PrintX also normalizes them). The default SMTP port is `465`; port `587` with STARTTLS is supported too. Restart the frontend after changing `.env.local`.
+
 ```bash
 cd ..
 pnpm install

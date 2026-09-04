@@ -89,6 +89,8 @@ Gmail delivery is optional. Create a Google app password for the sending account
 GMAIL_USER=you@example.com
 GMAIL_APP_PASSWORD=your-16-character-app-password
 MAIL_FROM=you@example.com
+# Optional: use 465 (implicit TLS) or 587 (STARTTLS)
+GMAIL_SMTP_PORT=465
 ```
 
 These values are server-only. Never use `NEXT_PUBLIC_` for Gmail settings and never commit `.env.local` or credentials. The mail route intentionally uses Node's built-in `node:tls` module instead of a third-party email SDK.
