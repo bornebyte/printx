@@ -44,6 +44,14 @@ Copy `frontend/.env.example` to `frontend/.env.local` and add the Firebase Web A
 
 The worker is a long-running, local service. Its core runtime depends on portable ports for event transport, document storage, job reporting, and printer access. OS-specific printing should be implemented only behind the printer adapter boundary. See [worker/README.md](worker/README.md) and [docs/architecture.md](docs/architecture.md).
 
+### Supabase data
+
+Dashboard data is loaded through authenticated server routes backed by Supabase. Apply the SQL migration in [supabase/migrations](supabase/migrations) and follow [supabase/README.md](supabase/README.md) for the required server-only keys. Firebase remains the sign-in provider; the server verifies Firebase ID tokens before reading or changing database records.
+
+### Error tracking
+
+API failures return a stable `errorCode` and `requestId`. Browser errors, server route failures, and render failures are written to `error_events` when Supabase is available and also logged as structured JSON. The UI shows the same code and request ID in retryable error states.
+
 ## Commands
 
 ```bash

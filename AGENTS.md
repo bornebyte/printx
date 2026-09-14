@@ -26,9 +26,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Data Access
 
-- Use Prisma as the ORM for database access.
-- Keep database models, migrations, and generated Prisma client usage consistent with the repository's Prisma setup.
-- Do not introduce a second ORM or bypass Prisma for routine application data access without documenting the reason.
+- Use Supabase/Postgres for application data access.
+- Keep schema changes in `supabase/migrations/` and use server-only Supabase service-role access from authenticated API routes.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser. Verify Firebase ID tokens before resolving profile, business, job, printer, or error records.
 
 ## Cross-Platform Worker
 
