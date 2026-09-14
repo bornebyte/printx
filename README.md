@@ -1,47 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PrintX Platform
 
-## Getting Started
+PrintX is a distributed printing platform that connects people and businesses with local printers. This repository is organized as a small monorepo so the web experience and the local print service can evolve independently while sharing clear contracts.
 
-First, run the development server:
+## Repository layout
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+printx/
+├── frontend/       # Next.js web application
+├── worker/         # Cross-platform local print worker
+├── docs/           # Architecture and operational documentation
+├── AGENTS.md       # Repository-wide development rules
+├── LICENSE
+└── package.json    # Workspace commands
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Getting started
 
-## PrintX routes
+Requirements: Node.js 20 or newer and pnpm 10 or newer.
 
-- `/` — product home page with the service overview and interactive workflow demo
-- `/auth` — Firebase-ready email/password and Google authentication
-- `/dashboard/personal` — personal printing workspace
-- `/dashboard/business` — business operations workspace
+```bash
+pnpm install
+pnpm dev
+```
 
-### Firebase setup
+The web application runs at `http://localhost:3000`. The worker starts in local demo mode when no event-stream endpoint is configured and exposes health checks at `http://localhost:8787/healthz`.
 
-Copy `.env.example` to `.env.local`, add the Firebase Web App configuration values, and enable Email/Password and Google providers in Firebase Authentication. The auth page remains available in demo/setup mode until those values are configured.
+Run either package independently:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev:frontend
+pnpm dev:worker
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Applications
 
-## Learn More
+### Frontend
 
-To learn more about Next.js, take a look at the following resources:
+The public product site is at `/`. Authentication is at `/auth`, with Firebase email/password and Google sign-in support. The two workspace experiences are available at `/dashboard/personal` and `/dashboard/business`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Copy `frontend/.env.example` to `frontend/.env.local` and add the Firebase Web App values to enable authentication.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Worker
 
-## Deploy on Vercel
+The worker is a long-running, local service. Its core runtime depends on portable ports for event transport, document storage, job reporting, and printer access. OS-specific printing should be implemented only behind the printer adapter boundary. See [worker/README.md](worker/README.md) and [docs/architecture.md](docs/architecture.md).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Commands
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm build       # build frontend and worker
+pnpm lint        # lint the frontend
+pnpm typecheck   # type-check every package
+pnpm clean       # remove generated package output
+```
+
+## License
+
+PrintX is released under the MIT License. See [LICENSE](LICENSE).

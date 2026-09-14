@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -13,9 +13,10 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# next.js and package output
+.next/
+out/
+dist/
 
 # production
 /build
@@ -32,6 +33,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!**/.env.example
+
+# worker runtime state and local spool files
+/worker/runtime/
+/worker/spool/
+/worker/dist/
 
 # vercel
 .vercel

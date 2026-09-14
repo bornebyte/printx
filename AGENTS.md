@@ -10,6 +10,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Project Guidelines
 
+## Repository Layout
+
+- Keep the Next.js application inside `frontend/`.
+- Keep the local print service inside `worker/`.
+- Keep cross-package contracts and operational decisions documented in `docs/`.
+- Keep this `AGENTS.md` at the repository root so it governs every package.
+
 ## UI and UX
 
 - Use shadcn/ui components throughout the application wherever a suitable component exists.
